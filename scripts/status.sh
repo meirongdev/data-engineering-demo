@@ -21,7 +21,8 @@ ${_C_GREEN}Access from your host:${_C_RESET}
   Iceberg REST catalog http://localhost:8181/v1/config
   SeaweedFS S3 API     http://localhost:8333
   SeaweedFS master UI  http://localhost:9333
+  Postgres (oneshop)   postgres://etluser@localhost:5432/oneshop  (password: etlpassword)
 
-${_C_DIM}In-cluster DNS: seaweedfs:8333 (S3), iceberg-rest:8181 (catalog)
+${_C_DIM}In-cluster DNS: seaweedfs:8333 (S3), iceberg-rest:8181 (catalog), postgres:5432 (source)
 S3 credentials: admin / password${_C_RESET}
 EOF

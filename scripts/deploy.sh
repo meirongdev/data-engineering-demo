@@ -15,9 +15,13 @@ log "Deploying SeaweedFS (object storage) ..."
 kc apply -f "${K8S_DIR}/10-seaweedfs.yaml"
 kc rollout status deploy/seaweedfs --timeout=180s
 
-log "Creating the 'warehouse' bucket ..."
+log "Creating the SeaweedFS buckets ..."
 kc apply -f "${K8S_DIR}/20-bucket-init.yaml"
 kc wait --for=condition=complete job/bucket-init --timeout=120s
+
+log "Deploying Postgres (oneshop source) ..."
+kc apply -f "${K8S_DIR}/50-postgres.yaml"
+kc rollout status deploy/postgres --timeout=180s
 
 log "Deploying the Iceberg REST catalog ..."
 kc apply -f "${K8S_DIR}/30-iceberg-rest.yaml"

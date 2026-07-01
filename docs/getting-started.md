@@ -20,8 +20,8 @@ This single command is idempotent and does three things:
 
 1. Creates the kind cluster (`data-eng`) from `cluster/kind-config.yaml` if it
    doesn't already exist.
-2. Builds the `spark-iceberg:local` image natively for your CPU arch and
-   `kind load`s it into the cluster (no registry needed).
+2. Builds the `spark-iceberg:local` and `loadgen:local` images natively for your
+   CPU arch and `kind load`s them into the cluster (no registry needed).
 3. Applies the k8s manifests in dependency order and waits for each to become
    ready.
 
@@ -56,13 +56,25 @@ Shows nodes, pods, services, and the host URLs.
 | http://localhost:8181/v1/config | Iceberg REST catalog |
 | http://localhost:8333 | SeaweedFS S3 API (`admin` / `password`) |
 | http://localhost:9333 | SeaweedFS master UI |
+| localhost:5432 | Postgres `oneshop` source (`etluser` / `etlpassword`) |
+
+## Run the data pipeline
+
+```bash
+make pipeline
+```
+
+Seeds the Postgres + pageview sources and runs the full medallion (bronze →
+silver → gold) ETL, ending with a top-items-by-revenue table. The same steps are
+walked through interactively in notebooks `01`–`04`. See
+[pipeline.md](pipeline.md) for the details.
 
 ## Using the lakehouse
 
 Open **http://localhost:8888** and start with
-[`notebooks/00-getting-started.ipynb`](../notebooks/00-getting-started.ipynb).
-Notebooks are persisted on a PVC, so your edits survive pod restarts (but not
-`make down`).
+[`notebooks/00-getting-started.ipynb`](../notebooks/00-getting-started.ipynb),
+then work through `01`–`04` for the pipeline. Notebooks are persisted on a PVC,
+so your edits survive pod restarts (but not `make down`).
 
 ### From Spark (PySpark)
 

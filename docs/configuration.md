@@ -13,9 +13,23 @@ time (`docker build --build-arg ICEBERG_VERSION=…`) or edit the defaults.
 | Spark | 3.5.8 (`hadoop3` build) | `ARG SPARK_VERSION` |
 | Iceberg (Spark runtime + AWS bundle) | 1.10.1 | `ARG ICEBERG_VERSION` |
 | Scala | 2.12 | `ARG SCALA_VERSION` |
+| Postgres JDBC driver | 42.7.6 | `ARG POSTGRES_JDBC_VERSION` |
+| hadoop-aws (s3a://) | 3.3.4 | `ARG HADOOP_AWS_VERSION` |
+| aws-java-sdk-bundle (s3a:// deps) | 1.12.262 | `ARG AWS_SDK_BUNDLE_VERSION` |
 | PyIceberg | 0.11.1 (`[pyarrow,duckdb,pandas]`) | `pip install` |
 | JupyterLab | 4.6.1 | `pip install` |
 | pandas / prettytable / matplotlib | 2.3.3 / 3.18.0 / 3.11.0 | `pip install` |
+
+`hadoop-aws` **must** match the Hadoop version bundled in the Spark
+`bin-hadoop3` distribution (3.3.4 for Spark 3.5.x), and `aws-java-sdk-bundle`
+must be the version that `hadoop-aws` was built against — otherwise `s3a://`
+reads fail at runtime. These jars power raw-JSON reads for the pipeline and are
+independent of Iceberg's `S3FileIO` (which uses the AWS SDK **v2** shaded into
+`iceberg-aws-bundle`).
+
+The loadgen image (`docker/loadgen/Dockerfile`, `python:3.11-slim-bookworm`)
+pins its Python deps in `docker/loadgen/requirements.txt`:
+`psycopg2-binary` 2.9.9, `boto3` 1.35.0, `Faker` 30.0.0.
 
 Container images used by the manifests:
 
@@ -23,8 +37,10 @@ Container images used by the manifests:
 |---|---|---|
 | `10-seaweedfs.yaml` | `chrislusf/seaweedfs` | `4.37` |
 | `20-bucket-init.yaml` | `minio/mc` | `latest` |
+| `50-postgres.yaml` | `postgres` | `16` |
 | `30-iceberg-rest.yaml` | `apache/iceberg-rest-fixture` | `1.10.1` |
 | `40-spark-iceberg.yaml` | `spark-iceberg` (built locally) | `local` |
+| `60-loadgen.yaml` | `loadgen` (built locally) | `local` |
 
 The `iceberg-rest-fixture` tag intentionally tracks the Iceberg jar version in
 the image (both `1.10.1`) so the catalog and Spark agree on the table spec. It is
@@ -57,6 +73,13 @@ automatically. Key settings:
 | `spark.driver.memory` | `1g` | kept small to fit a kind worker |
 | `spark.sql.shuffle.partitions` | `4` | small-data default |
 | `spark.eventLog.*` | `/home/iceberg/spark-events` | for the Spark UI |
+| `spark.hadoop.fs.s3a.endpoint` | `http://seaweedfs:8333` | `s3a://` reads (raw pageview JSON) |
+| `spark.hadoop.fs.s3a.path.style.access` | `true` | **required** for SeaweedFS |
+| `spark.hadoop.fs.s3a.connection.ssl.enabled` | `false` | plain-HTTP in-cluster |
+
+The `fs.s3a.*` block is only used by the pipeline's raw-JSON read
+(`20_s3_to_bronze.py` / notebook `02`); Iceberg table I/O uses the `demo.s3.*`
+settings above instead.
 
 ## PyIceberg — `docker/spark/pyiceberg.yaml`
 
@@ -88,6 +111,7 @@ and do not reuse the credentials elsewhere.
 |---|---|---|
 | `seaweedfs-data` | 2 Gi | `10-seaweedfs.yaml` |
 | `notebooks` | 1 Gi | `40-spark-iceberg.yaml` |
+| `postgres-data` | 1 Gi | `50-postgres.yaml` |
 
 Both use kind's default `standard` StorageClass (the local-path provisioner).
 SeaweedFS is also capped by `-master.volumeSizeLimitMB=1024`. Bump these if you
@@ -100,6 +124,8 @@ plan to load larger datasets.
 | `seaweedfs` | 100m | 256Mi | 1Gi |
 | `iceberg-rest` | 100m | 384Mi | 1Gi |
 | `spark-iceberg` | 250m | 1Gi | 3Gi |
+| `postgres` | 100m | 256Mi | 1Gi |
+| `loadgen` (Job) | 100m | 128Mi | 512Mi |
 
 ## Pinning the Kubernetes version
 

@@ -1,9 +1,11 @@
 # Architecture
 
 This lab runs a complete Iceberg lakehouse inside a single [kind](https://kind.sigs.k8s.io/)
-cluster (namespace `lakehouse`). Three workloads make up the stack, plus a
-one-shot bucket bootstrap Job. For the high-level diagram, see the
-[README](../README.md#architecture).
+cluster (namespace `lakehouse`). Three core workloads make up the lakehouse
+stack (object storage, catalog, compute), plus a Postgres **source** database, a
+one-shot bucket bootstrap Job, and an on-demand load generator Job. For the
+high-level diagram, see the [README](../README.md#architecture); for the ETL
+that runs on top, see [pipeline.md](pipeline.md).
 
 ## The three layers
 
@@ -47,9 +49,40 @@ one-shot bucket bootstrap Job. For the high-level diagram, see the
 ### Bootstrap — bucket-init (`k8s/20-bucket-init.yaml`)
 
 A one-shot `minio/mc` Job that waits for SeaweedFS, then creates the `warehouse`
-bucket. `S3FileIO` never creates buckets, so the warehouse must exist before
-Iceberg writes anything. The Job is idempotent (`mc mb --ignore-existing`) and
+and `pageviews` buckets. `S3FileIO` never creates buckets, so the warehouse must
+exist before Iceberg writes anything; `pageviews` holds the raw clickstream JSON
+the loadgen drops. The Job is idempotent (`mc mb --ignore-existing`) and
 self-cleans 600 s after completion.
+
+## The source & pipeline (chapter 03)
+
+### Source database — Postgres (`k8s/50-postgres.yaml`)
+
+- `postgres:16` holding the "oneshop" OLTP tables (`users`, `items`,
+  `purchases`). Schema and the read-only `etluser` login are bootstrapped on
+  first start from the `postgres-bootstrap` ConfigMap (mounted into
+  `/docker-entrypoint-initdb.d`); the actual rows come from the loadgen.
+- Data persists on a **1 Gi** PVC (`postgres-data`); the Deployment uses the
+  `Recreate` strategy. Reachable in-cluster at `postgres:5432` and from the host
+  at `localhost:5432`.
+- Deployed as part of `make deploy` (it's a standing component, not a Job).
+
+### Load generator — loadgen (`k8s/60-loadgen.yaml`)
+
+- The locally built `loadgen:local` image (Python). A one-shot Job that
+  TRUNCATEs and seeds the Postgres tables and writes a bounded batch of pageview
+  events as newline-delimited JSON into the `pageviews` bucket, then exits.
+- Idempotent and reproducible — re-running gives a clean dataset. Not part of
+  `make deploy`; it's (re)applied on demand by `make pipeline` / `make loadgen`.
+- An init container waits for both Postgres (5432) and SeaweedFS (8333).
+
+### Pipeline — Spark medallion ETL (`docker/spark/pipeline/`)
+
+Five `spark-submit` stages, baked into the Spark image at `/opt/pipeline/` and
+run in order by `scripts/pipeline.sh`: create tables → Postgres-to-bronze →
+pageviews-to-bronze → bronze-to-silver → silver-to-gold. The same logic is
+walked through interactively in notebooks `01`–`04`. Full detail in
+[pipeline.md](pipeline.md).
 
 ## How a query flows
 
@@ -79,9 +112,11 @@ with no `kubectl port-forward`.
 | 8181 | 30181 | `iceberg-rest` | Iceberg REST catalog |
 | 8333 | 30333 | `seaweedfs` | SeaweedFS S3 API |
 | 9333 | 30933 | `seaweedfs` | SeaweedFS master UI |
+| 5432 | 30432 | `postgres` | Postgres `oneshop` source |
 
 Inside the cluster, workloads reach each other by Service DNS:
-`seaweedfs:8333` (S3) and `iceberg-rest:8181` (catalog).
+`seaweedfs:8333` (S3), `iceberg-rest:8181` (catalog), and `postgres:5432`
+(source).
 
 ## Persistence model
 
@@ -89,6 +124,7 @@ Inside the cluster, workloads reach each other by Service DNS:
 |---|---|---|---|
 | S3 objects (table data + metadata files) | `seaweedfs-data` PVC (2 Gi) | ✅ | ❌ |
 | Your notebooks | `notebooks` PVC (1 Gi) | ✅ | ❌ |
+| Postgres source rows | `postgres-data` PVC (1 Gi) | ✅ | ❌ |
 | Catalog table registry | in-memory in `iceberg-rest` | ❌ | ❌ |
 
 `make down` deletes the whole kind cluster, including both PVCs. Because the

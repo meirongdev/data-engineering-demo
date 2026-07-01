@@ -1,0 +1,53 @@
+# One-shot load generator Job.
+#
+# Seeds the "oneshop" Postgres tables and writes pageview JSON into the
+# SeaweedFS `pageviews` bucket, then exits. Not part of `make deploy`; it is
+# (re)applied on demand by scripts/pipeline.sh (`make pipeline`). Idempotent —
+# the generator truncates Postgres and clears the bucket before seeding.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: loadgen
+  namespace: lakehouse
+  labels:
+    app: loadgen
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: loadgen
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-deps
+          image: busybox:1.38
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done
+              until nc -z seaweedfs 8333; do echo waiting for seaweedfs; sleep 2; done
+      containers:
+        - name: loadgen
+          image: loadgen:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: POSTGRES_HOST, value: postgres }
+            - { name: POSTGRES_PORT, value: "5432" }
+            - { name: POSTGRES_USER, value: postgresuser }
+            - { name: POSTGRES_PASSWORD, value: postgrespw }
+            - { name: POSTGRES_DB, value: oneshop }
+            - { name: S3_ENDPOINT, value: "http://seaweedfs:8333" }
+            - { name: S3_ACCESS_KEY, value: admin }
+            - { name: S3_SECRET_KEY, value: password }
+            - { name: PAGEVIEWS_BUCKET, value: pageviews }
+            # Bounded, reproducible seed. Bump these to generate more data.
+            - { name: USER_COUNT, value: "1000" }
+            - { name: ITEM_COUNT, value: "200" }
+            - { name: PURCHASE_COUNT, value: "200" }
+            - { name: PAGEVIEWS_PER_PURCHASE, value: "30" }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }

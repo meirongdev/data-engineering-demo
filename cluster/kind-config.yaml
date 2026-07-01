@@ -9,6 +9,7 @@
 #   localhost:8181  -> Iceberg REST catalog  (NodePort 30181)
 #   localhost:8333  -> SeaweedFS S3 API      (NodePort 30333)
 #   localhost:9333  -> SeaweedFS master UI    (NodePort 30933)
+#   localhost:5432  -> Postgres (oneshop)     (NodePort 30432)
 #
 # The k8s version follows whatever node image ships with your kind release.
 # To pin it, add e.g. `image: kindest/node:v1.36.1` under each node.
@@ -32,6 +33,9 @@ nodes:
         protocol: TCP
       - containerPort: 30933
         hostPort: 9333
+        protocol: TCP
+      - containerPort: 30432
+        hostPort: 5432
         protocol: TCP
   - role: worker
   - role: worker

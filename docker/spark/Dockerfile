@@ -14,6 +14,12 @@ ARG SPARK_VERSION=3.5.8
 ARG SPARK_MAJOR_VERSION=3.5
 ARG ICEBERG_VERSION=1.10.1
 ARG SCALA_VERSION=2.12
+# JDBC driver for the Postgres source. hadoop-aws + the AWS SDK v1 bundle let
+# Spark read raw JSON over s3a:// (Iceberg's own S3FileIO is separate, SDK v2).
+# hadoop-aws MUST match the Hadoop version bundled in spark-*-bin-hadoop3 (3.3.4).
+ARG POSTGRES_JDBC_VERSION=42.7.6
+ARG HADOOP_AWS_VERSION=3.3.4
+ARG AWS_SDK_BUNDLE_VERSION=1.12.262
 
 ENV SPARK_HOME=/opt/spark
 ENV SPARK_VERSION=${SPARK_VERSION}
@@ -53,6 +59,16 @@ RUN curl -fSL "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-r
     curl -fSL "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${ICEBERG_VERSION}/iceberg-aws-bundle-${ICEBERG_VERSION}.jar" \
       -o ${SPARK_HOME}/jars/iceberg-aws-bundle-${ICEBERG_VERSION}.jar
 
+# Source connectors for the medallion pipeline:
+#   * Postgres JDBC driver         -> read the "oneshop" OLTP tables
+#   * hadoop-aws + aws-java-sdk    -> read raw pageview JSON over s3a://
+RUN curl -fSL "https://repo1.maven.org/maven2/org/postgresql/postgresql/${POSTGRES_JDBC_VERSION}/postgresql-${POSTGRES_JDBC_VERSION}.jar" \
+      -o ${SPARK_HOME}/jars/postgresql-${POSTGRES_JDBC_VERSION}.jar && \
+    curl -fSL "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_AWS_VERSION}/hadoop-aws-${HADOOP_AWS_VERSION}.jar" \
+      -o ${SPARK_HOME}/jars/hadoop-aws-${HADOOP_AWS_VERSION}.jar && \
+    curl -fSL "https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/${AWS_SDK_BUNDLE_VERSION}/aws-java-sdk-bundle-${AWS_SDK_BUNDLE_VERSION}.jar" \
+      -o ${SPARK_HOME}/jars/aws-java-sdk-bundle-${AWS_SDK_BUNDLE_VERSION}.jar
+
 ENV PYTHONPATH=${SPARK_HOME}/python:${SPARK_HOME}/python/lib/py4j-0.10.9.7-src.zip
 ENV PYSPARK_PYTHON=python3
 ENV PATH=${SPARK_HOME}/bin:${SPARK_HOME}/sbin:${PATH}
@@ -68,6 +84,10 @@ COPY docker/spark/ipython/startup/ /root/.ipython/profile_default/startup/
 # Seed notebooks. An init step copies these into the notebooks PVC on first run.
 RUN mkdir -p /opt/seed-notebooks /home/iceberg/notebooks /home/iceberg/spark-events
 COPY notebooks/ /opt/seed-notebooks/
+
+# Medallion pipeline scripts, run non-interactively via spark-submit
+# (`make pipeline`). Same logic the guided notebooks walk through.
+COPY docker/spark/pipeline/ /opt/pipeline/
 
 COPY docker/spark/entrypoint.sh /opt/entrypoint.sh
 RUN chmod +x /opt/entrypoint.sh

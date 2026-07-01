@@ -7,7 +7,7 @@ CLUSTER_NAME ?= data-eng
 NAMESPACE    ?= lakehouse
 CONTEXT      := kind-$(CLUSTER_NAME)
 
-.PHONY: up down deploy build status smoke logs jupyter shell help
+.PHONY: up down deploy build status smoke pipeline loadgen logs jupyter shell help
 
 up: ## Create the kind cluster, build/load the image, and deploy everything
 	./scripts/up.sh
@@ -26,6 +26,15 @@ status: ## Show pods/services and the host access URLs
 
 smoke: ## Run the end-to-end Iceberg smoke test inside the cluster
 	./scripts/smoke-test.sh
+
+pipeline: ## Run the full medallion pipeline (loadgen -> bronze -> silver -> gold)
+	./scripts/pipeline.sh
+
+loadgen: ## (Re)run just the load generator Job (seed Postgres + pageviews)
+	kubectl --context $(CONTEXT) -n $(NAMESPACE) delete job loadgen --ignore-not-found
+	kubectl --context $(CONTEXT) -n $(NAMESPACE) apply -f k8s/60-loadgen.yaml
+	kubectl --context $(CONTEXT) -n $(NAMESPACE) wait --for=condition=complete job/loadgen --timeout=300s
+	kubectl --context $(CONTEXT) -n $(NAMESPACE) logs job/loadgen --tail=20
 
 logs: ## Tail the Spark/Jupyter pod logs
 	kubectl --context $(CONTEXT) -n $(NAMESPACE) logs -f deploy/spark-iceberg

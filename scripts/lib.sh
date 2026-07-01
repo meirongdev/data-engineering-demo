@@ -5,6 +5,7 @@
 CLUSTER_NAME="${CLUSTER_NAME:-data-eng}"
 NAMESPACE="${NAMESPACE:-lakehouse}"
 IMAGE="${IMAGE:-spark-iceberg:local}"
+LOADGEN_IMAGE="${LOADGEN_IMAGE:-loadgen:local}"
 
 # Repo root = parent of this scripts/ dir, resolved regardless of caller cwd.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

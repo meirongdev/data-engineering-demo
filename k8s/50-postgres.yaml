@@ -1,0 +1,137 @@
+# Postgres — the operational (OLTP) source database for the "oneshop" demo.
+#
+# Holds the users / items / purchases tables. The loadgen Job seeds them; the
+# Spark pipeline reads them over JDBC into the Iceberg `bronze` layer.
+# Schema + the read-only ETL role are bootstrapped on first start from the
+# ConfigMap below (Postgres runs everything in /docker-entrypoint-initdb.d once,
+# when the data directory is empty).
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-bootstrap
+  namespace: lakehouse
+data:
+  # Schema only — the loadgen container is responsible for the actual rows so
+  # the seed stays reproducible (it TRUNCATEs before inserting).
+  01-schema.sql: |
+    -- A read-only role for the ETL/JDBC reader, plus a dedicated login.
+    CREATE ROLE readonly;
+    GRANT CONNECT ON DATABASE oneshop TO readonly;
+    GRANT USAGE ON SCHEMA public TO readonly;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO readonly;
+
+    CREATE USER etluser WITH PASSWORD 'etlpassword';
+    GRANT readonly TO etluser;
+
+    CREATE TABLE IF NOT EXISTS users (
+        id         SERIAL PRIMARY KEY,
+        first_name VARCHAR(100),
+        last_name  VARCHAR(100),
+        email      VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS items (
+        id         SERIAL PRIMARY KEY,
+        name       VARCHAR(100),
+        category   VARCHAR(100),
+        price      DECIMAL(7,2),
+        inventory  INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS purchases (
+        id             SERIAL PRIMARY KEY,
+        user_id        BIGINT REFERENCES users(id),
+        item_id        BIGINT REFERENCES items(id),
+        quantity       INT DEFAULT 1,
+        purchase_price DECIMAL(12,2),
+        created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Make sure the reader can see these specific tables (belt and braces —
+    -- the default-privileges grant above only covers tables created afterwards).
+    GRANT SELECT ON users, items, purchases TO readonly;
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: lakehouse
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: lakehouse
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          env:
+            - { name: POSTGRES_USER, value: postgresuser }
+            - { name: POSTGRES_PASSWORD, value: postgrespw }
+            - { name: POSTGRES_DB, value: oneshop }
+            # Keep PGDATA in a subdir so the initdb bootstrap sees an empty dir
+            # even though the PVC root has a lost+found on some provisioners.
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports:
+            - { name: postgres, containerPort: 5432 }
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgresuser", "-d", "oneshop"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: 5432 }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 1Gi }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: bootstrap, mountPath: /docker-entrypoint-initdb.d }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+        - name: bootstrap
+          configMap:
+            name: postgres-bootstrap
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: lakehouse
+  labels:
+    app: postgres
+spec:
+  type: NodePort
+  selector:
+    app: postgres
+  ports:
+    - { name: postgres, port: 5432, targetPort: 5432, nodePort: 30432 }

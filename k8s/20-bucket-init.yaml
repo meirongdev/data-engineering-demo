@@ -1,6 +1,7 @@
-# One-shot Job: create the `warehouse` bucket in SeaweedFS.
-# S3FileIO never creates buckets, so the warehouse must exist before Iceberg
-# writes any data. Idempotent — safe to re-run.
+# One-shot Job: create the SeaweedFS buckets the demo needs.
+#   * warehouse — Iceberg table data + metadata (S3FileIO never creates buckets).
+#   * pageviews — raw clickstream JSON dropped by the loadgen (bronze source).
+# Idempotent — safe to re-run.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -27,7 +28,8 @@ spec:
               until mc alias set sw http://seaweedfs:8333 admin password >/dev/null 2>&1; do
                 echo '...waiting...'; sleep 2;
               done
-              echo "Creating bucket: warehouse"
+              echo "Creating buckets: warehouse, pageviews"
               mc mb --ignore-existing sw/warehouse
+              mc mb --ignore-existing sw/pageviews
               mc ls sw
               echo "Done."

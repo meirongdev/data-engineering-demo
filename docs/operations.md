@@ -8,10 +8,12 @@ logging helpers + the `kc` kubectl wrapper).
 
 | Command | What it does | Script |
 |---|---|---|
-| `make up` | Create the cluster, build/load the image, deploy the full stack | `scripts/up.sh` |
-| `make build` | Rebuild `spark-iceberg:local` and `kind load` it | `scripts/build-image.sh` |
+| `make up` | Create the cluster, build/load the images, deploy the full stack | `scripts/up.sh` |
+| `make build` | Rebuild `spark-iceberg:local` + `loadgen:local` and `kind load` them | `scripts/build-image.sh` |
 | `make deploy` | (Re)apply the k8s manifests and wait for readiness | `scripts/deploy.sh` |
 | `make smoke` | End-to-end Iceberg write/read test inside the cluster | `scripts/smoke-test.sh` |
+| `make pipeline` | Run the medallion pipeline: loadgen → bronze → silver → gold | `scripts/pipeline.sh` |
+| `make loadgen` | (Re)run just the loadgen Job (seed Postgres + pageviews) | (kubectl) |
 | `make status` | Show pods, services, and host URLs | `scripts/status.sh` |
 | `make logs` | Tail the Spark/Jupyter deployment logs | (kubectl) |
 | `make jupyter` | Open Jupyter Lab in your browser | (open) |
@@ -25,12 +27,24 @@ each to be ready before the next:
 
 1. `00-namespace.yaml` — namespace `lakehouse`
 2. `10-seaweedfs.yaml` — object storage → `rollout status deploy/seaweedfs`
-3. `20-bucket-init.yaml` — create `warehouse` bucket → `wait job/bucket-init complete`
-4. `30-iceberg-rest.yaml` — REST catalog → `rollout status deploy/iceberg-rest`
-5. `40-spark-iceberg.yaml` — Spark + Jupyter → `rollout status deploy/spark-iceberg`
+3. `20-bucket-init.yaml` — create `warehouse` + `pageviews` buckets → `wait job/bucket-init complete`
+4. `50-postgres.yaml` — Postgres source → `rollout status deploy/postgres`
+5. `30-iceberg-rest.yaml` — REST catalog → `rollout status deploy/iceberg-rest`
+6. `40-spark-iceberg.yaml` — Spark + Jupyter → `rollout status deploy/spark-iceberg`
 
-The manifests' own init containers also gate startup (the catalog waits for
-SeaweedFS; Spark waits for both), so a re-apply out of order still converges.
+`60-loadgen.yaml` is **not** applied by `make deploy` — it's an on-demand Job run
+by `make pipeline` / `make loadgen`. The manifests' own init containers also gate
+startup (the catalog waits for SeaweedFS; Spark and loadgen wait for their deps),
+so a re-apply out of order still converges.
+
+## Running the pipeline
+
+`make pipeline` (`scripts/pipeline.sh`) runs the whole medallion flow: it
+(re)applies the loadgen Job and waits for it, then `spark-submit`s each stage in
+`/opt/pipeline/` inside the Spark pod, in order. The pipeline scripts are baked
+into the image, so **after editing anything in `docker/spark/pipeline/` run
+`make build`** (which reloads the image and restarts the pod) before
+`make pipeline`. See [pipeline.md](pipeline.md).
 
 ## The rebuild / iterate loop
 
@@ -38,8 +52,10 @@ SeaweedFS; Spark waits for both), so a re-apply out of order still converges.
   script** → re-run the relevant step, then re-verify:
   - Manifest only: `make deploy && make smoke`
   - Dockerfile / image config (`spark-defaults.conf`, `pyiceberg.yaml`, IPython
-    startup, seed notebooks): `make build && make deploy && make smoke`
-    (`make deploy` restarts the pod so it picks up the freshly loaded image).
+    startup, seed notebooks, `docker/spark/pipeline/` scripts):
+    `make build && make smoke` (or `make pipeline`). The image tag is unchanged,
+    so `make build` rolls `spark-iceberg` itself after loading the new image —
+    a plain `kubectl apply`/`make deploy` would *not* restart the pod.
 - **Notebook content** → edit live in Jupyter at http://localhost:8888; changes
   persist on the notebooks PVC.
 - **Inspect a running pod** → `make logs` (tail Spark/Jupyter) or `make shell`
@@ -55,7 +71,8 @@ The scripts and the Makefile read three overridable variables (defaults from
 |---|---|---|
 | `CLUSTER_NAME` | `data-eng` | kind cluster name (context becomes `kind-<name>`) |
 | `NAMESPACE` | `lakehouse` | Kubernetes namespace |
-| `IMAGE` | `spark-iceberg:local` | image tag built and loaded |
+| `IMAGE` | `spark-iceberg:local` | Spark/Iceberg/Jupyter image tag |
+| `LOADGEN_IMAGE` | `loadgen:local` | load generator image tag |
 
 Override per-invocation, e.g.:
 
