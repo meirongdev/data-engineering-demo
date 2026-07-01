@@ -1,0 +1,42 @@
+# --- Version control ---
+.git/
+.gitignore
+.gitattributes
+
+# --- Project config (not needed inside the image) ---
+.editorconfig
+.dockerignore
+pyproject.toml
+Makefile
+README.md
+LICENSE
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- IDE / Editor ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+._*
+
+# --- K8s / Cluster (not needed for the image) ---
+k8s/
+cluster/
+scripts/

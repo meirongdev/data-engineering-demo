@@ -1,0 +1,81 @@
+# Spark + Iceberg + Jupyter Lab — the compute / notebook layer.
+# Uses the locally built `spark-iceberg:local` image loaded into kind.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: notebooks
+  namespace: lakehouse
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-iceberg
+  namespace: lakehouse
+  labels:
+    app: spark-iceberg
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: spark-iceberg
+  template:
+    metadata:
+      labels:
+        app: spark-iceberg
+    spec:
+      initContainers:
+        - name: wait-for-deps
+          image: busybox:1.38
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z seaweedfs 8333; do echo waiting for seaweedfs; sleep 2; done
+              until nc -z iceberg-rest 8181; do echo waiting for iceberg-rest; sleep 2; done
+      containers:
+        - name: spark-iceberg
+          image: spark-iceberg:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: jupyter, containerPort: 8888 }
+            - { name: spark-ui, containerPort: 4040 }
+          env:
+            - { name: AWS_ACCESS_KEY_ID, value: admin }
+            - { name: AWS_SECRET_ACCESS_KEY, value: password }
+            - { name: AWS_REGION, value: us-east-1 }
+          readinessProbe:
+            httpGet: { path: /lab, port: 8888 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 250m, memory: 1Gi }
+            limits: { memory: 3Gi }
+          volumeMounts:
+            - { name: notebooks, mountPath: /home/iceberg/notebooks }
+      volumes:
+        - name: notebooks
+          persistentVolumeClaim:
+            claimName: notebooks
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-iceberg
+  namespace: lakehouse
+  labels:
+    app: spark-iceberg
+spec:
+  type: NodePort
+  selector:
+    app: spark-iceberg
+  ports:
+    - { name: jupyter, port: 8888, targetPort: 8888, nodePort: 30888 }
+    - { name: spark-ui, port: 4040, targetPort: 4040, nodePort: 30404 }

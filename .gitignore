@@ -1,0 +1,59 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+*.jupyter-desktop*
+
+# --- Spark ---
+spark-warehouse/
+metastore_db/
+derby.log
+spark-events/
+
+# --- Docker ---
+*.tar
+*.tar.gz
+
+# --- Environment ---
+.env
+.env.*
+!.env.example
+
+# --- IDE / Editor ---
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# --- OS ---
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# --- Logs ---
+*.log
+
+# --- Kubernetes (local) ---
+.kube/

@@ -1,0 +1,13 @@
+# PyIceberg config so you can talk to the catalog without Spark, e.g.:
+#
+#   from pyiceberg.catalog import load_catalog
+#   cat = load_catalog("default")
+#   cat.list_namespaces()
+catalog:
+  default:
+    uri: http://iceberg-rest:8181
+    s3.endpoint: http://seaweedfs:8333
+    s3.access-key-id: admin
+    s3.secret-access-key: password
+    s3.path-style-access: "true"
+    s3.region: us-east-1

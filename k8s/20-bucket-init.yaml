@@ -1,0 +1,33 @@
+# One-shot Job: create the `warehouse` bucket in SeaweedFS.
+# S3FileIO never creates buckets, so the warehouse must exist before Iceberg
+# writes any data. Idempotent — safe to re-run.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bucket-init
+  namespace: lakehouse
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: bucket-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for SeaweedFS S3 ..."
+              until mc alias set sw http://seaweedfs:8333 admin password >/dev/null 2>&1; do
+                echo '...waiting...'; sleep 2;
+              done
+              echo "Creating bucket: warehouse"
+              mc mb --ignore-existing sw/warehouse
+              mc ls sw
+              echo "Done."
