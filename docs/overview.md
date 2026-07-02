@@ -150,3 +150,4 @@ loadgen ──► Postgres (users/items/purchases) ──JDBC──┐
 - **Versions, config, credentials** → [configuration.md](configuration.md)
 - **Day-to-day commands & the rebuild loop** → [operations.md](operations.md)
 - **When something breaks** → [troubleshooting.md](troubleshooting.md)
+- **Taking it to production** → [production.md](production.md) — what to swap each lab component for, and why

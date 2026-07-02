@@ -118,6 +118,7 @@ Detailed docs live under [`docs/`](docs/):
 - [Operations](docs/operations.md) — `make` targets, the scripts behind them, config env vars, and the rebuild/iterate loop.
 - [Configuration](docs/configuration.md) — versions, Spark/PyIceberg settings, credentials, storage sizes, and version pinning.
 - [Troubleshooting](docs/troubleshooting.md) — common failures and how to recover.
+- [From lab to production](docs/production.md) — this is a lab; what you'd swap each component for (orchestration, catalog, ingestion, storage, secrets, …) to run it for real, and why.
 
 ## Security note
 
