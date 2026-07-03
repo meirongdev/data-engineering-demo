@@ -1,7 +1,9 @@
 # The medallion data pipeline
 
 This lab layers a classic **medallion (bronze → silver → gold)** ETL on top of
-the Iceberg lakehouse. It's a kind-native take on a classic Docker Compose
+the Iceberg lakehouse. New to the pattern? [medallion.md](medallion.md)
+introduces what each layer is for and the principles behind it; this page is the
+concrete implementation. It's a kind-native take on a classic Docker Compose
 lakehouse tutorial, adapted to this stack:
 
 | Typical Docker Compose tutorial | This lab (kind) |

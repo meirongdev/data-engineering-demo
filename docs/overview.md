@@ -47,7 +47,9 @@ The pipeline exists to turn that raw data into decisions:
 
 Rather than one giant query, the data is refined in layers, each with a clear
 job. That separation is what makes an analytics platform maintainable: every
-layer is independently testable, reprocessable, and reusable.
+layer is independently testable, reprocessable, and reusable. For the pattern in
+general — what each layer is for and the principles behind it — see
+[medallion.md](medallion.md).
 
 | Layer | Business meaning | Example output |
 |---|---|---|
@@ -143,6 +145,7 @@ loadgen ──► Postgres (users/items/purchases) ──JDBC──┐
 ## Where to go next
 
 - **Run it** → [getting-started.md](getting-started.md)
+- **The medallion pattern itself** → [medallion.md](medallion.md)
 - **Pipeline, stage by stage** → [pipeline.md](pipeline.md)
 - **Component-level architecture reference** (ports, PVCs, probes, data flow) →
   [architecture.md](architecture.md)

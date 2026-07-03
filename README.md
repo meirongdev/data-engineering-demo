@@ -113,6 +113,7 @@ Detailed docs live under [`docs/`](docs/):
 
 - [Overview](docs/overview.md) — the project from two angles: the **business** scenario (what "oneshop" is and the questions the pipeline answers) and the **technical architecture** (components, ingestion paths, design trade-offs). Start here.
 - [Getting started](docs/getting-started.md) — prerequisites, first run, the smoke test, and querying Iceberg from Spark, `%%sql`, and PyIceberg.
+- [Medallion architecture](docs/medallion.md) — the bronze → silver → gold pattern itself: what each layer is for, the principles behind it, and how this lab maps onto it. Read before the pipeline.
 - [Pipeline](docs/pipeline.md) — the medallion (bronze → silver → gold) ETL: sources, each stage, how to run it, and how to explore the results.
 - [Architecture](docs/architecture.md) — each component, how metadata and data flow, in-cluster DNS, ports, and persistence.
 - [Operations](docs/operations.md) — `make` targets, the scripts behind them, config env vars, and the rebuild/iterate loop.
