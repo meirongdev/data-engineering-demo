@@ -1,5 +1,8 @@
-# Apache Iceberg REST catalog (the reference "rest-fixture" image).
-# Stores table metadata in-memory and the data/metadata files in SeaweedFS.
+# Apache Iceberg REST catalog — production-grade server with JdbcCatalog
+# backed by Postgres for persistent table metadata.
+#
+# Data/metadata files still live in SeaweedFS (s3://warehouse/); only the
+# catalog registry (namespace + table entries) is in Postgres.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -22,20 +25,28 @@ spec:
         - name: wait-for-seaweedfs
           image: busybox:1.38
           command: ["sh", "-c", "until nc -z seaweedfs 8333; do echo waiting for seaweedfs; sleep 2; done"]
+        - name: wait-for-postgres
+          image: busybox:1.38
+          command: ["sh", "-c", "until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done"]
       containers:
         - name: iceberg-rest
-          image: apache/iceberg-rest-fixture:1.10.1
+          image: iceberg-rest:local
           ports:
             - { name: rest, containerPort: 8181 }
           env:
+            # --- S3 / SeaweedFS (data files) ---
             - { name: AWS_ACCESS_KEY_ID, value: admin }
             - { name: AWS_SECRET_ACCESS_KEY, value: password }
             - { name: AWS_REGION, value: us-east-1 }
             - { name: CATALOG_WAREHOUSE, value: "s3://warehouse/" }
             - { name: CATALOG_IO__IMPL, value: org.apache.iceberg.aws.s3.S3FileIO }
             - { name: CATALOG_S3_ENDPOINT, value: "http://seaweedfs:8333" }
-            # SeaweedFS needs path-style addressing (no bucket-as-subdomain).
             - { name: CATALOG_S3_PATH__STYLE__ACCESS, value: "true" }
+            # --- JdbcCatalog backend (table metadata in Postgres) ---
+            - { name: CATALOG_CATALOG__IMPL, value: org.apache.iceberg.jdbc.JdbcCatalog }
+            - { name: CATALOG_URI, value: "jdbc:postgresql://postgres:5432/iceberg_catalog" }
+            - { name: CATALOG_JDBC_USER, value: postgresuser }
+            - { name: CATALOG_JDBC_PASSWORD, value: postgrespw }
           readinessProbe:
             httpGet: { path: /v1/config, port: 8181 }
             initialDelaySeconds: 10

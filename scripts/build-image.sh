@@ -22,13 +22,20 @@ docker build \
   "${ROOT_DIR}"
 ok "Built ${LOADGEN_IMAGE}"
 
+log "Building image ${ICEBERG_REST_IMAGE} ..."
+docker build \
+  -f "${ROOT_DIR}/docker/iceberg-rest/Dockerfile" \
+  -t "${ICEBERG_REST_IMAGE}" \
+  "${ROOT_DIR}"
+ok "Built ${ICEBERG_REST_IMAGE}"
+
 if ! cluster_exists; then
   warn "Cluster '${CLUSTER_NAME}' not found — skipping load. Create it first (scripts/up.sh)."
   exit 0
 fi
 
 log "Loading images into kind cluster '${CLUSTER_NAME}' ..."
-kind load docker-image "${IMAGE}" "${LOADGEN_IMAGE}" --name "${CLUSTER_NAME}"
+kind load docker-image "${IMAGE}" "${LOADGEN_IMAGE}" "${ICEBERG_REST_IMAGE}" --name "${CLUSTER_NAME}"
 ok "Images loaded into cluster"
 
 # The image tag is unchanged, so kubectl apply alone won't restart a running
@@ -38,4 +45,12 @@ if kc get deploy/spark-iceberg >/dev/null 2>&1; then
   kc rollout restart deploy/spark-iceberg
   kc rollout status deploy/spark-iceberg --timeout=300s
   ok "spark-iceberg restarted on the new image"
+fi
+
+# Same for iceberg-rest.
+if kc get deploy/iceberg-rest >/dev/null 2>&1; then
+  log "Restarting iceberg-rest to pick up the new image ..."
+  kc rollout restart deploy/iceberg-rest
+  kc rollout status deploy/iceberg-rest --timeout=180s
+  ok "iceberg-rest restarted on the new image"
 fi

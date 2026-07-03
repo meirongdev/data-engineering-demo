@@ -2,13 +2,19 @@
 # Shared helpers + config for the demo scripts. Source this, don't run it.
 
 # --- config (override via env) ------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load defaults from defaults.env, then allow env overrides.
+if [ -f "${SCRIPT_DIR}/defaults.env" ]; then
+  set -a; source "${SCRIPT_DIR}/defaults.env"; set +a
+fi
 CLUSTER_NAME="${CLUSTER_NAME:-data-eng}"
 NAMESPACE="${NAMESPACE:-lakehouse}"
 IMAGE="${IMAGE:-spark-iceberg:local}"
 LOADGEN_IMAGE="${LOADGEN_IMAGE:-loadgen:local}"
+ICEBERG_REST_IMAGE="${ICEBERG_REST_IMAGE:-iceberg-rest:local}"
 
 # Repo root = parent of this scripts/ dir, resolved regardless of caller cwd.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # --- pretty logging -----------------------------------------------------------

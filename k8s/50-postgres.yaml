@@ -56,6 +56,11 @@ data:
     -- Make sure the reader can see these specific tables (belt and braces —
     -- the default-privileges grant above only covers tables created afterwards).
     GRANT SELECT ON users, items, purchases TO readonly;
+
+  02-catalog-db.sql: |
+    -- Create the Iceberg catalog database for the REST server's JdbcCatalog.
+    -- The JdbcCatalog creates its own schema tables on first connection.
+    CREATE DATABASE iceberg_catalog;
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

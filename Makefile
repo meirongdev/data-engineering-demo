@@ -2,10 +2,9 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-# Config — override via env or `make VAR=value`. Mirrors scripts/lib.sh.
-CLUSTER_NAME ?= data-eng
-NAMESPACE    ?= lakehouse
-CONTEXT      := kind-$(CLUSTER_NAME)
+# Config — single source of truth in scripts/defaults.env; override via env or `make VAR=value`.
+include scripts/defaults.env
+CONTEXT := kind-$(CLUSTER_NAME)
 
 .PHONY: up down deploy build status smoke pipeline loadgen logs jupyter shell help
 
@@ -31,10 +30,7 @@ pipeline: ## Run the full medallion pipeline (loadgen -> bronze -> silver -> gol
 	./scripts/pipeline.sh
 
 loadgen: ## (Re)run just the load generator Job (seed Postgres + pageviews)
-	kubectl --context $(CONTEXT) -n $(NAMESPACE) delete job loadgen --ignore-not-found
-	kubectl --context $(CONTEXT) -n $(NAMESPACE) apply -f k8s/60-loadgen.yaml
-	kubectl --context $(CONTEXT) -n $(NAMESPACE) wait --for=condition=complete job/loadgen --timeout=300s
-	kubectl --context $(CONTEXT) -n $(NAMESPACE) logs job/loadgen --tail=20
+	./scripts/run-loadgen.sh
 
 logs: ## Tail the Spark/Jupyter pod logs
 	kubectl --context $(CONTEXT) -n $(NAMESPACE) logs -f deploy/spark-iceberg

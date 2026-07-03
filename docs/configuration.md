@@ -38,14 +38,15 @@ Container images used by the manifests:
 | `10-seaweedfs.yaml` | `chrislusf/seaweedfs` | `4.37` |
 | `20-bucket-init.yaml` | `minio/mc` | `latest` |
 | `50-postgres.yaml` | `postgres` | `16` |
-| `30-iceberg-rest.yaml` | `apache/iceberg-rest-fixture` | `1.10.1` |
+| `30-iceberg-rest.yaml` | `iceberg-rest` (built locally) | `local` |
 | `40-spark-iceberg.yaml` | `spark-iceberg` (built locally) | `local` |
 | `60-loadgen.yaml` | `loadgen` (built locally) | `local` |
 
-The `iceberg-rest-fixture` tag intentionally tracks the Iceberg jar version in
-the image (both `1.10.1`) so the catalog and Spark agree on the table spec. It is
-also the newest fixture image published — there is no `1.11.x` image yet, even
-though the Iceberg Java artifacts have reached 1.11.0.
+The `iceberg-rest` image is built from `docker/iceberg-rest/Dockerfile`, which
+extends `apache/iceberg-rest:1.10.1` and adds the Postgres JDBC driver for
+persistent table metadata via JdbcCatalog. The base image tag tracks the Iceberg
+jar version in the Spark image (both `1.10.1`) so the catalog and Spark agree on
+the table spec.
 
 Init containers use `busybox:1.38` (in `30-iceberg-rest.yaml` and
 `40-spark-iceberg.yaml`).

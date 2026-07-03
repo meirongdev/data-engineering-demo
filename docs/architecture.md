@@ -23,16 +23,19 @@ that runs on top, see [pipeline.md](pipeline.md).
 
 ### 2. Table catalog — Iceberg REST (`k8s/30-iceberg-rest.yaml`)
 
-- The reference `apache/iceberg-rest-fixture:1.10.1` image, serving the Iceberg
-  REST catalog protocol on port **8181**.
-- Table **metadata is stored in-memory** — it does *not* survive a pod restart.
-  The data and metadata *files* it points at, however, live durably in
-  SeaweedFS. (This is the fixture's design; it is for demos, not production.)
-- Configured entirely through env vars to write into SeaweedFS:
+- The locally built `iceberg-rest:local` image, extending
+  `apache/iceberg-rest:1.10.1` with the Postgres JDBC driver for persistent
+  table metadata via JdbcCatalog. Serves the Iceberg REST catalog protocol on
+  port **8181**.
+- Table **metadata is stored in Postgres** (`iceberg_catalog` database) — it
+  survives pod restarts. The data and metadata *files* live durably in SeaweedFS.
+- Configured through env vars: `CATALOG_CATALOG__IMPL=…JdbcCatalog`,
+  `CATALOG_URI=jdbc:postgresql://postgres:5432/iceberg_catalog`,
   `CATALOG_WAREHOUSE=s3://warehouse/`, `CATALOG_IO__IMPL=…S3FileIO`,
   `CATALOG_S3_ENDPOINT=http://seaweedfs:8333`, and
   `CATALOG_S3_PATH__STYLE__ACCESS=true`.
-- An init container blocks startup until SeaweedFS is reachable on 8333.
+- Two init containers block startup until both SeaweedFS (8333) and Postgres
+  (5432) are reachable.
 
 ### 3. Compute / notebooks — Spark + Jupyter (`k8s/40-spark-iceberg.yaml`)
 
@@ -125,8 +128,8 @@ Inside the cluster, workloads reach each other by Service DNS:
 | S3 objects (table data + metadata files) | `seaweedfs-data` PVC (2 Gi) | ✅ | ❌ |
 | Your notebooks | `notebooks` PVC (1 Gi) | ✅ | ❌ |
 | Postgres source rows | `postgres-data` PVC (1 Gi) | ✅ | ❌ |
-| Catalog table registry | in-memory in `iceberg-rest` | ❌ | ❌ |
+| Catalog table registry | `iceberg_catalog` database in Postgres | ✅ | ❌ |
 
-`make down` deletes the whole kind cluster, including both PVCs. Because the
-catalog registry is in-memory, restarting the `iceberg-rest` pod loses the list
-of tables even though the underlying files remain in SeaweedFS.
+`make down` deletes the whole kind cluster, including all PVCs. The catalog
+registry is now backed by Postgres, so restarting the `iceberg-rest` pod no
+longer loses the list of tables — only a full `make down` destroys everything.
