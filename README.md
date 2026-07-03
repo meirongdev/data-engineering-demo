@@ -1,9 +1,9 @@
 # data-engineering-demo
 
 A hands-on learning lab for the **Apache Iceberg lakehouse** stack, running end
-to end on a local [kind](https://kind.sigs.k8s.io/) Kubernetes cluster. Inspired
-by chapters 02–03 of *Practical Data Engineering with Apache Projects*, but moved
-off Docker Compose onto Kubernetes and modernised.
+to end on a local [kind](https://kind.sigs.k8s.io/) Kubernetes cluster. It takes
+a classic Docker Compose–based lakehouse tutorial stack and moves it off Docker
+Compose onto Kubernetes, modernised.
 
 | Layer | Component | Why |
 |---|---|---|

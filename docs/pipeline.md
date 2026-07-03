@@ -1,10 +1,10 @@
 # The medallion data pipeline
 
 This lab layers a classic **medallion (bronze → silver → gold)** ETL on top of
-the Iceberg lakehouse. It's the kind-native rework of chapter 03 of *Practical
-Data Engineering with Apache Projects*, adapted to this stack:
+the Iceberg lakehouse. It's a kind-native take on a classic Docker Compose
+lakehouse tutorial, adapted to this stack:
 
-| Chapter 03 (Docker Compose) | This lab (kind) |
+| Typical Docker Compose tutorial | This lab (kind) |
 |---|---|
 | MinIO for object storage | **SeaweedFS** (S3 API) |
 | Postgres source (`oneshop`) | same, as `k8s/50-postgres.yaml` |

@@ -11,9 +11,9 @@ It is deliberately bounded and idempotent: it TRUNCATEs the Postgres tables and
 clears the pageviews bucket first, so re-running gives a clean, reproducible
 dataset. Counts are configurable via env (see the CONFIG block).
 
-Adapted from chapter-03 of *Practical Data Engineering with Apache Projects*
-(which targeted Postgres + MinIO); here it targets Postgres + SeaweedFS and
-batches pageviews into NDJSON objects instead of one tiny object per event.
+Mirrors a typical Postgres + MinIO ingestion setup; here it targets
+Postgres + SeaweedFS and batches pageviews into NDJSON objects instead of one
+tiny object per event.
 """
 
 import io

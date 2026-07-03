@@ -54,7 +54,7 @@ exist before Iceberg writes anything; `pageviews` holds the raw clickstream JSON
 the loadgen drops. The Job is idempotent (`mc mb --ignore-existing`) and
 self-cleans 600 s after completion.
 
-## The source & pipeline (chapter 03)
+## The source & pipeline
 
 ### Source database — Postgres (`k8s/50-postgres.yaml`)
 

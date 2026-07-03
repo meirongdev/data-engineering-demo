@@ -55,7 +55,7 @@ layer is independently testable, reprocessable, and reusable.
 | **Silver** | *Clean it and connect it.* Validate emails, normalise categories, clamp bad prices, and join raw facts into meaningful entities (a purchase enriched with who bought what; a pageview tied to a real product). The layer analysts actually work on. | `silver.purchases_enriched`, `silver.users` (with `valid_email`) |
 | **Gold** | *Answer the question directly.* Aggregated, decision-ready tables. | `gold.item_performance` — one row per product with revenue, orders, pageviews, conversion rate |
 
-### What the chapter-03 update added
+### What the pipeline update added
 
 Before, the lab could only show that the lakehouse *plumbing* worked (create and
 read a toy table). Now it demonstrates a realistic **end-to-end analytics
@@ -134,10 +134,9 @@ loadgen ──► Postgres (users/items/purchases) ──JDBC──┐
   reproducible dataset (tunable via env: `USER_COUNT`, `PURCHASE_COUNT`, …).
 - **Notebooks *and* `make pipeline`** — the same logic, two entry points:
   interactive teaching vs. automated end-to-end run.
-- **Ported from the book** — adapted from chapters 02–03 of *Practical Data
-  Engineering with Apache Projects*: MinIO → SeaweedFS, Postgres added as a k8s
-  component, `hadoop-aws` jars added for `s3a`, and the default catalog is the
-  `demo` REST catalog.
+- **Adapted from a Docker Compose tutorial** — MinIO → SeaweedFS, Postgres added
+  as a k8s component, `hadoop-aws` jars added for `s3a`, and the default catalog
+  is the `demo` REST catalog.
 
 ---
 
