@@ -87,6 +87,34 @@ DDL = [
     ) USING iceberg PARTITIONED BY (item_category)
     TBLPROPERTIES ('comment' = 'Per-item revenue, traffic and conversion')
     """,
+    # --- extended gold analytics plan -----------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS demo.gold.top_selling_items (
+        item_id BIGINT, item_name STRING, item_category STRING,
+        total_revenue DECIMAL(20,2)
+    ) USING iceberg
+    TBLPROPERTIES ('comment' = 'Top 10 items by revenue')
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS demo.gold.sales_performance_24h (
+        purchase_hour INT, total_revenue DECIMAL(20,2)
+    ) USING iceberg
+    TBLPROPERTIES ('comment' = 'Hourly revenue over the last 24 hours')
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS demo.gold.pageviews_by_channel (
+        channel STRING, total_pageviews BIGINT
+    ) USING iceberg
+    TBLPROPERTIES ('comment' = 'Pageview count per traffic channel')
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS demo.gold.user_engagement_segments (
+        user_id BIGINT, email STRING, full_name STRING,
+        total_pageviews BIGINT, active_days BIGINT, last_active_date DATE,
+        days_since_last_active INT, engagement_segment STRING
+    ) USING iceberg PARTITIONED BY (engagement_segment)
+    TBLPROPERTIES ('comment' = 'RFM-style user engagement segmentation')
+    """,
 ]
 
 for stmt in DDL:

@@ -28,8 +28,9 @@ spec:
               until mc alias set sw http://seaweedfs:8333 admin password >/dev/null 2>&1; do
                 echo '...waiting...'; sleep 2;
               done
-              echo "Creating buckets: warehouse, pageviews"
+              echo "Creating buckets: warehouse, pageviews, customer-segments"
               mc mb --ignore-existing sw/warehouse
               mc mb --ignore-existing sw/pageviews
+              mc mb --ignore-existing sw/customer-segments
               mc ls sw
               echo "Done."

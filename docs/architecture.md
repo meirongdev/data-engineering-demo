@@ -66,10 +66,11 @@ on a 1 Gi PVC.
 
 ### Bootstrap — bucket-init (`k8s/20-bucket-init.yaml`)
 
-A one-shot `minio/mc` Job that waits for SeaweedFS, then creates the `warehouse`
-and `pageviews` buckets. `S3FileIO` never creates buckets, so the warehouse must
-exist before Iceberg writes anything; `pageviews` holds the raw clickstream JSON
-the loadgen drops. The Job is idempotent (`mc mb --ignore-existing`) and
+A one-shot `minio/mc` Job that waits for SeaweedFS, then creates the `warehouse`,
+`pageviews`, and `customer-segments` buckets. `S3FileIO` never creates buckets,
+so the warehouse must exist before Iceberg writes anything; `pageviews` holds
+the raw clickstream JSON the loadgen drops; `customer-segments` receives the
+gold-layer CSV export. The Job is idempotent (`mc mb --ignore-existing`) and
 self-cleans 600 s after completion.
 
 ## The source & pipeline
@@ -96,11 +97,14 @@ self-cleans 600 s after completion.
 
 ### Pipeline — Spark medallion ETL (`docker/spark/pipeline/`)
 
-Five `spark-submit` stages, baked into the Spark image at `/opt/pipeline/` and
+Six `spark-submit` stages, baked into the Spark image at `/opt/pipeline/` and
 run in order by `scripts/pipeline.sh`: create tables → Postgres-to-bronze →
-pageviews-to-bronze → bronze-to-silver → silver-to-gold. The same logic is
-walked through interactively in notebooks `01`–`04`. Full detail in
-[pipeline.md](pipeline.md).
+pageviews-to-bronze → bronze-to-silver → silver-to-gold (core) →
+gold (extended). The same logic is walked through interactively in notebooks
+`01`–`04`. Full detail in [pipeline.md](pipeline.md).
+
+An optional [CronJob (`k8s/90-pipeline-cron.yaml`)](../k8s/90-pipeline-cron.yaml)
+schedules the full pipeline daily at 06:00 UTC using K8s-native scheduling.
 
 ## How a query flows
 

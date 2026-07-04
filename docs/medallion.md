@@ -112,7 +112,8 @@ This lab implements a concrete bronze → silver → gold pipeline over a fictio
 |---|---|---|
 | **Bronze** | `demo.bronze.purchases`, `demo.bronze.pageviews` | raw copies of the Postgres OLTP tables (via JDBC) and the raw pageview JSON (via `s3a://`) |
 | **Silver** | `demo.silver.purchases_enriched`, `demo.silver.users` | validate emails, normalise categories, clamp prices, and join facts into enriched entities |
-| **Gold** | `demo.gold.item_performance` | one row per product with revenue, orders, pageviews, and `conversion_rate` |
+| **Gold** | `demo.gold.item_performance`, `demo.gold.top_selling_items`, `demo.gold.sales_performance_24h`, `demo.gold.pageviews_by_channel`, `demo.gold.user_engagement_segments` | product analytics (revenue, conversion, top sellers, hourly trends), user analytics (RFM-style engagement segments), channel analysis |
+| **Gold CSV export** | `s3a://customer-segments/segmented_users/` | engagement segments delivered as CSV to object storage for downstream teams |
 
 The full table list, the transform in each stage, and how to run it (`make
 pipeline` or notebooks `01`–`04`) are documented in

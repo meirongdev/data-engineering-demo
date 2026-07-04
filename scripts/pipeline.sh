@@ -34,6 +34,7 @@ run_stage 10_postgres_to_bronze.py  "Postgres -> bronze"
 run_stage 20_s3_to_bronze.py        "pageviews JSON -> bronze"
 run_stage 30_bronze_to_silver.py    "bronze -> silver"
 run_stage 40_silver_to_gold.py      "silver -> gold"
+run_stage 50_gold_analytics.py      "gold analytics (extended)"
 
 echo
 ok "Pipeline complete. Explore the results in Jupyter (notebooks 01-04) or:"

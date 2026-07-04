@@ -35,13 +35,27 @@ ingestion challenge a data platform has to solve.
 The pipeline exists to turn that raw data into decisions:
 
 - **Which products actually make money?** — revenue, orders, and units sold per
-  item.
+  item (`gold.item_performance`), and the top earners at a glance
+  (`gold.top_selling_items`).
 - **Which products get attention but don't sell?** — the **conversion rate**
   (`orders ÷ pageviews`). High traffic + low conversion is a pricing or
   merchandising problem worth flagging.
 - **How healthy is our customer data?** — e.g. what share of customers have a
   missing or invalid email (a reachability signal for marketing).
-- **How does revenue break down by category, and when do people buy?**
+- **How does revenue break down by category, and when do people buy?** —
+  category analysis from `gold.item_performance`, and hourly revenue trends
+  from `gold.sales_performance_24h`.
+- **Which traffic channels drive the most engagement?** — `gold.pageviews_by_channel`
+  shows where your audience comes from.
+- **Who are your most valuable users?** — `gold.user_engagement_segments` scores
+  every customer by pageview frequency and recency, labelling them
+  `high_engagement`, `medium_engagement`, or `low_engagement`. This is the
+  kind of RFM-style segmentation (**R**ecency, **F**requency, **M**onetary) a
+  marketing team uses to target campaigns — here scored on recency + frequency
+  only, with the monetary axis left out (see [pipeline.md](pipeline.md)).
+- **How do you deliver data to a downstream team?** — the engagement segments
+  are also exported as a CSV file to SeaweedFS (`s3a://customer-segments/segmented_users/`),
+  ready for a non-lakehouse consumer (email platform, CRM tool, spreadsheet).**
 
 ### Why bronze → silver → gold
 
@@ -55,15 +69,34 @@ general — what each layer is for and the principles behind it — see
 |---|---|---|
 | **Bronze** | *Land the raw data faithfully.* A trustworthy copy of each source, no business logic — so anything downstream can always be rebuilt from here. | `bronze.purchases`, `bronze.pageviews` |
 | **Silver** | *Clean it and connect it.* Validate emails, normalise categories, clamp bad prices, and join raw facts into meaningful entities (a purchase enriched with who bought what; a pageview tied to a real product). The layer analysts actually work on. | `silver.purchases_enriched`, `silver.users` (with `valid_email`) |
-| **Gold** | *Answer the question directly.* Aggregated, decision-ready tables. | `gold.item_performance` — one row per product with revenue, orders, pageviews, conversion rate |
+| **Gold** | *Answer the question directly.* Aggregated, decision-ready tables. | `gold.item_performance`, `gold.top_selling_items`, `gold.sales_performance_24h`, `gold.pageviews_by_channel`, `gold.user_engagement_segments` |
 
 ### What the pipeline update added
 
 Before, the lab could only show that the lakehouse *plumbing* worked (create and
 read a toy table). Now it demonstrates a realistic **end-to-end analytics
-capability**: from raw operational + behavioral e-commerce data all the way to a
-product-performance table a business could act on — reproducibly, with one
-command (`make pipeline`) or interactively in notebooks `01`–`04`.
+capability**: from raw operational + behavioral e-commerce data all the way to
+five gold tables a business could act on — product analytics (revenue,
+conversion, top sellers, hourly performance), user analytics (engagement
+segmentation), and channel analysis — plus a CSV export to object storage for
+downstream teams. All of it is reproducible with one command (`make pipeline`)
+or interactively in notebooks `01`–`04`.
+
+The gold layer now covers two analytic domains:
+
+- **Product analytics** — which items sell, which get attention but don't
+  convert, when revenue peaks, and which channels drive traffic.
+- **User analytics** — who your most engaged users are, via RFM-style scoring
+  combining pageview frequency, active days, and recency.
+
+The CSV export to `s3a://customer-segments/segmented_users/` shows the
+**data product delivery** pattern: gold tables aren't only consumed inside the
+lakehouse (via Trino or notebooks); they can be pushed out as flat files for
+external tools that don't speak Iceberg (marketing platforms, CRM, spreadsheets).
+
+An optional [CronJob](../k8s/90-pipeline-cron.yaml) can schedule the full
+pipeline refresh daily at 06:00 UTC — using K8s-native scheduling rather than
+adding Airflow.
 
 ---
 

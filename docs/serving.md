@@ -90,8 +90,27 @@ From the Trino CLI (inside the cluster or if you have the Trino CLI installed):
 ```sql
 SHOW CATALOGS;                           -- should show "iceberg"
 SHOW SCHEMAS FROM iceberg;               -- shows bronze, silver, gold
-SHOW TABLES FROM iceberg.gold;           -- shows item_performance
+SHOW TABLES FROM iceberg.gold;           -- shows all 5 gold tables
 SELECT * FROM iceberg.gold.item_performance LIMIT 10;
+
+-- Top sellers (from the materialised gold table)
+SELECT item_name, item_category, total_revenue
+FROM iceberg.gold.top_selling_items;
+
+-- Hourly revenue snapshot
+SELECT purchase_hour, total_revenue
+FROM iceberg.gold.sales_performance_24h
+ORDER BY purchase_hour;
+
+-- Traffic by channel
+SELECT channel, total_pageviews
+FROM iceberg.gold.pageviews_by_channel
+ORDER BY total_pageviews DESC;
+
+-- User engagement breakdown
+SELECT engagement_segment, count(*) AS user_count
+FROM iceberg.gold.user_engagement_segments
+GROUP BY engagement_segment;
 ```
 
 From a notebook (`05-query-with-trino.ipynb`), connect via the Trino JDBC driver
@@ -120,8 +139,13 @@ print(cur.fetchone())
    | Username | (leave blank — Trino has no auth in this lab) |
    | Password | (leave blank) |
 
-4. Metabase will scan the `iceberg` catalog and discover the gold-layer tables.
-5. Build a question or dashboard on `item_performance`.
+4. Metabase will scan the `iceberg` catalog and discover the gold-layer tables —
+   `item_performance`, `top_selling_items`, `sales_performance_24h`,
+   `pageviews_by_channel`, and `user_engagement_segments`.
+5. Build a question or dashboard on any of them. For example: a bar chart of
+   `top_selling_items` showing which products generate the most revenue, a
+   leaderboard of `pageviews_by_channel`, or a pie chart of
+   `user_engagement_segments` showing the split between high/medium/low users.
 
 The Trino driver is already installed in the `metabase:local` image — the
 "Trino" database type should appear in the dropdown automatically.

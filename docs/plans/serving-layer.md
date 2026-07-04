@@ -1,30 +1,29 @@
 # Plan: add a query + BI serving layer (Trino + Metabase)
 
-> **Status:** proposed, not started. Drafted 2026-07-04.
-> Self-contained implementation plan — pick this up and execute without
-> re-deriving. Referenced from `MEMORY.md`.
+> **Status:** ✅ IMPLEMENTED (commit `4d1747a`, 2026-07-04). Delivered:
+> `k8s/70-trino.yaml`, `k8s/80-metabase.yaml`, `docker/metabase/Dockerfile`,
+> `scripts/deploy-serving.sh` (`make serving`), `docs/serving.md`,
+> `notebooks/05-query-with-trino.ipynb`. Kept as an executed-plan record.
+> Drafted 2026-07-04.
 
 ## Why this exists (the gap)
 
-This repo is a modernized, Kubernetes-native rebuild of the Docker Compose
-lakehouse in *Practical Data Engineering with Apache Projects*, **chapter-04**
-(`~/projects/exploration/Practical-Data-Engineering-with-Apache-Projects/chapter-04`).
+This repo runs a complete medallion pipeline (bronze → silver → gold) on a
+local kind cluster with SeaweedFS storage, Iceberg REST catalog, and Spark ETL.
+Before this plan, the stack covered storage, catalog, and batch compute — but
+had no **interactive query** or **BI** layer. Users could only explore gold
+tables through Spark notebooks or `spark-sql`, which is heavy for ad-hoc
+analytics and unfamiliar to business analysts.
 
-The repo has already reproduced **and modernized** almost all of that chapter:
+The gap is the serving layer — the final piece of the lakehouse stack:
 
-| chapter-04 | this repo | status |
+| Component | This repo (before) | This plan adds |
 |---|---|---|
-| MinIO | SeaweedFS | ✅ modernized |
-| `iceberg-rest-fixture` (in-memory) | REST fixture + **JdbcCatalog on Postgres** | ✅ persistent |
-| `spark-iceberg` + notebooks | Spark 3.5 + Iceberg 1.10 + Jupyter | ✅ |
-| Postgres `oneshop` + loadgen | same | ✅ |
-| bronze→silver→gold | richer Spark medallion pipeline | ✅ (better than book) |
-| **Trino** (interactive SQL / serving engine) | — | ❌ **the gap** |
-| **Superset** (BI dashboards on gold) | — | ❌ **the gap** |
-
-The one layer chapter-04 has that this repo lacks is the **query + BI serving
-layer**. Adding it completes the lakehouse story:
-*storage → catalog → ETL compute (Spark) → **interactive query (Trino) → BI (Metabase)***.
+| Object storage (SeaweedFS) | ✅ | — |
+| Table catalog (Iceberg REST) | ✅ | — |
+| Batch ETL (Spark) | ✅ | — |
+| Interactive SQL | ❌ needed | **Trino** |
+| BI dashboards | ❌ needed | **Metabase** |
 
 **The teaching point that makes it worth doing:** Trino talks to the *same*
 `iceberg-rest` catalog and the *same* SeaweedFS data files Spark writes — one

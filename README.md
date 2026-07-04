@@ -110,13 +110,14 @@ docker/loadgen/              one-shot seeder image (Postgres + pageview JSON)
 k8s/                         manifests, applied in order by deploy.sh
   00-namespace.yaml
   10-seaweedfs.yaml          storage: ConfigMap (S3 creds) + PVC + Deployment + NodePort Svc
-  20-bucket-init.yaml        Job: create the `warehouse` + `pageviews` buckets
+  20-bucket-init.yaml        Job: create the `warehouse` + `pageviews` + `customer-segments` buckets
   50-postgres.yaml           Postgres source: bootstrap ConfigMap + PVC + Deployment + Svc
   30-iceberg-rest.yaml       Iceberg REST catalog
   40-spark-iceberg.yaml      Spark + Jupyter (uses the locally built image)
   60-loadgen.yaml            Job: seed Postgres + pageviews (run on demand by make pipeline)
   70-trino.yaml              Trino SQL engine (opt-in, deployed by make serving)
   80-metabase.yaml           Metabase BI dashboards (opt-in, deployed by make serving)
+  90-pipeline-cron.yaml      Daily pipeline refresh CronJob (optional, kubectl apply -f)
 notebooks/                   seeded into Jupyter on first start (00 intro, 01-04 pipeline, 05 Trino)
 scripts/                     up / down / build-image / deploy / status / smoke-test / pipeline (+ lib.sh)
 Makefile                     thin wrapper over scripts/

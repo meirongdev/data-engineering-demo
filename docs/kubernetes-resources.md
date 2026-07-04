@@ -213,12 +213,46 @@ Two Jobs in this lab:
 
 | Job | Purpose | Runs when |
 |---|---|---|
-| `bucket-init` | Create `warehouse` and `pageviews` buckets on SeaweedFS | `make deploy` |
+| `bucket-init` | Create `warehouse`, `pageviews`, and `customer-segments` buckets on SeaweedFS | `make deploy` |
 | `loadgen` | Seed Postgres tables and write pageview JSON | `make pipeline` / `make loadgen` |
 
 Jobs have a `backoffLimit` (retry count) and `ttlSecondsAfterFinished` (how
 long to keep the completed pod around for log inspection). The `bucket-init`
 Job also deletes itself after 600 seconds via `ttlSecondsAfterFinished: 600`.
+
+## CronJob (`90-pipeline-cron.yaml`, optional)
+
+**What it is:** A Job on a schedule. A CronJob holds a `jobTemplate` and a cron
+`schedule`; at each firing the controller stamps out a fresh Job (which runs a
+pod to completion, exactly like the Jobs above) and then stops. It is the
+Kubernetes-native answer to "re-run this batch work every night" — no Airflow or
+external scheduler needed.
+
+The `pipeline-refresh` CronJob re-runs the whole medallion sequence
+(bronze → silver → gold) so the gold tables reflect current source state:
+
+| Field | Value | Why |
+|---|---|---|
+| `schedule` | `"0 6 * * *"` | Daily at 06:00 UTC (standard 5-field cron). |
+| `concurrencyPolicy` | `Forbid` | Skip a firing if the previous run is still going, rather than stacking overlapping pipeline runs on the same tables. |
+| `restartPolicy` | `Never` | A failed stage surfaces as a failed Job, not an infinite in-pod retry loop. |
+
+Unlike the two Jobs above, this CronJob is **not** applied by `make deploy` — it
+is opt-in:
+
+```bash
+kubectl apply -f k8s/90-pipeline-cron.yaml     # install the schedule
+kubectl get cronjobs,pods -n lakehouse -l app=pipeline-refresh
+kubectl delete cronjob pipeline-refresh -n lakehouse   # remove it
+```
+
+It runs the full `10`→`50` stage sequence rather than gold alone: a gold-only
+refresh would recompute from *stale* silver, and `sales_performance_24h`'s
+rolling-24h filter would age purchases out until the table trends empty. Note it
+does **not** re-run the loadgen, so no *new* source rows arrive between firings —
+keeping source data fresh would mean also scheduling the loadgen Job, which is
+out of scope for this lab. See [pipeline.md](pipeline.md#automated-daily-refresh-optional)
+for the operational detail.
 
 ## The `Recreate` strategy — why it matters
 

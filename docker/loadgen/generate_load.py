@@ -33,6 +33,7 @@ USER_COUNT = int(os.getenv("USER_COUNT", "1000"))
 ITEM_COUNT = int(os.getenv("ITEM_COUNT", "200"))
 PURCHASE_COUNT = int(os.getenv("PURCHASE_COUNT", "200"))
 PAGEVIEWS_PER_PURCHASE = int(os.getenv("PAGEVIEWS_PER_PURCHASE", "30"))
+PAGEVIEW_WINDOW_DAYS = int(os.getenv("PAGEVIEW_WINDOW_DAYS", "14"))  # scatter received_at for meaningful RFM recency
 NULL_EMAIL_RATE = float(os.getenv("NULL_EMAIL_RATE", "0.1"))  # exercise silver validation
 
 ITEM_PRICE_MIN = 5
@@ -106,11 +107,13 @@ def write_pageviews(s3, batch_index, events):
 
 def pageview(viewer_id, item_id):
     # URL shape must stay "/products/{item_id}" — the silver transform parses it.
+    # Scatter received_at over PAGEVIEW_WINDOW_DAYS so the RFM recency dimension
+    # is meaningful and the days(received_at) partition is non-degenerate.
     return {
         "user_id": viewer_id,
         "url": f"/products/{item_id}",
         "channel": random.choice(CHANNELS),
-        "received_at": int(time.time()),
+        "received_at": int(time.time() - random.randint(0, PAGEVIEW_WINDOW_DAYS * 86400)),
     }
 
 
