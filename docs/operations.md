@@ -19,7 +19,27 @@ logging helpers + the `kc` kubectl wrapper).
 | `make logs` | Tail the Spark/Jupyter deployment logs | (kubectl) |
 | `make jupyter` | Open Jupyter Lab in your browser | (open) |
 | `make shell` | Open a shell inside the Spark/Jupyter pod | (kubectl) |
+| `make check` | Static pre-flight checks (shell/notebook/YAML/image-pins) — no cluster needed | `scripts/check.sh` |
+| `make hooks` | Enable the git pre-commit hook (runs `make check` before each commit) | (git config) |
 | `make down` | Delete the kind cluster and all its data | `scripts/down.sh` |
+
+## Pre-commit checks
+
+`make check` (`scripts/check.sh`) runs fast, cluster-free static checks that guard
+against the regressions found in review, so the same problem can't come back:
+
+- shell scripts parse (`bash -n`, plus `shellcheck` if installed);
+- every notebook code cell parses **at Python 3.11** (the Spark image's runtime),
+  so 3.12-only syntax that would crash in-cluster is caught here;
+- `k8s/*.yaml` and `cluster/*.yaml` are well-formed;
+- no base image is pinned to `:latest` (`minio/mc` is the one allowed exception);
+- `docker/iceberg-rest/Dockerfile` stays on `apache/iceberg-rest` (not `tabulario`);
+- version pins agree between `pyproject.toml` and `docker/spark/Dockerfile`.
+
+Run `make hooks` **once per clone** to wire it in as a git pre-commit hook
+(`core.hooksPath=.githooks`); after that it runs on every `git commit`. Bypass a
+single commit with `git commit --no-verify`. Add a new guard by editing
+`scripts/check.sh`.
 
 ## Deploy order
 

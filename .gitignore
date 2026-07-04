@@ -43,6 +43,7 @@ spark-events/
 *~
 *.sublime-project
 *.sublime-workspace
+.qwen/
 
 # --- OS ---
 .DS_Store

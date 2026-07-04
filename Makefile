@@ -6,7 +6,7 @@ SHELL := /bin/bash
 include scripts/defaults.env
 CONTEXT := kind-$(CLUSTER_NAME)
 
-.PHONY: up down deploy build build-serving status serving smoke pipeline loadgen logs jupyter shell help
+.PHONY: up down deploy build build-serving status serving check hooks smoke pipeline loadgen logs jupyter shell help
 
 up: ## Create the kind cluster, build/load the image, and deploy everything
 	./scripts/up.sh
@@ -26,6 +26,14 @@ deploy: ## (Re)apply the k8s manifests and wait for readiness
 
 serving: ## Deploy the serving layer (Trino + Metabase) on top of the base stack
 	./scripts/deploy-serving.sh
+
+check: ## Run static pre-flight checks (shell/notebook/yaml/image-pins) — no cluster needed
+	./scripts/check.sh
+
+hooks: ## Enable the git pre-commit hook (runs `make check` before each commit)
+	git config core.hooksPath .githooks
+	@printf '  \033[0;32m✓\033[0m git pre-commit hook enabled (core.hooksPath=.githooks)\n'
+	@echo '    bypass a single commit with: git commit --no-verify'
 
 status: ## Show pods/services and the host access URLs
 	./scripts/status.sh
