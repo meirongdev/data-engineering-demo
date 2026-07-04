@@ -131,6 +131,12 @@ Detailed docs live under [`docs/`](docs/):
 - [Medallion architecture](docs/medallion.md) — the bronze → silver → gold pattern itself: what each layer is for, the principles behind it, and how this lab maps onto it. Read before the pipeline.
 - [Pipeline](docs/pipeline.md) — the medallion (bronze → silver → gold) ETL: sources, each stage, how to run it, and how to explore the results.
 - [Architecture](docs/architecture.md) — each component, how metadata and data flow, in-cluster DNS, ports, and persistence.
+- [Iceberg concepts](docs/iceberg-concepts.md) — snapshots, manifests, time travel, partitioning: the core Iceberg table format ideas this lab builds on.
+- [Spark basics](docs/spark-basics.md) — SparkSession, DataFrame, lazy evaluation, spark-submit, and how Spark runs inside the lab pod.
+- [Kubernetes resources](docs/kubernetes-resources.md) — Deployments, Services, PVCs, ConfigMaps, Jobs, Init Containers: the k8s resource types the manifests use.
+- [Docker images](docs/docker-images.md) — what each custom image contains, why the jars are pinned, and how the build pipeline works.
+- [PyIceberg usage](docs/pyiceberg-usage.md) — reading Iceberg tables without Spark, scanning with filters, and inspecting metadata.
+- [S3 access paths](docs/s3-access-paths.md) — the two S3 mechanisms (Iceberg S3FileIO vs. Hadoop s3a) and why both coexist.
 - [Operations](docs/operations.md) — `make` targets, the scripts behind them, config env vars, and the rebuild/iterate loop.
 - [Configuration](docs/configuration.md) — versions, Spark/PyIceberg settings, credentials, storage sizes, and version pinning.
 - [Troubleshooting](docs/troubleshooting.md) — common failures and how to recover.

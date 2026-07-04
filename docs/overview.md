@@ -144,6 +144,8 @@ loadgen ──► Postgres (users/items/purchases) ──JDBC──┐
 
 ## Where to go next
 
+- **Core concepts you hit along the way** → [iceberg-concepts.md](iceberg-concepts.md) (snapshots, manifests, time travel), [spark-basics.md](spark-basics.md) (DataFrame, lazy eval, spark-submit), [kubernetes-resources.md](kubernetes-resources.md) (Deployments, PVCs, Jobs, Services), [docker-images.md](docker-images.md) (why four custom images), [pyiceberg-usage.md](pyiceberg-usage.md) (no-Spark catalog access), [s3-access-paths.md](s3-access-paths.md) (S3FileIO vs. hadoop s3a)
+
 - **Run it** → [getting-started.md](getting-started.md)
 - **The medallion pattern itself** → [medallion.md](medallion.md)
 - **Pipeline, stage by stage** → [pipeline.md](pipeline.md)
