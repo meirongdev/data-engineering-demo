@@ -41,6 +41,8 @@ Container images used by the manifests:
 | `30-iceberg-rest.yaml` | `iceberg-rest` (built locally) | `local` |
 | `40-spark-iceberg.yaml` | `spark-iceberg` (built locally) | `local` |
 | `60-loadgen.yaml` | `loadgen` (built locally) | `local` |
+| `70-trino.yaml` | `trinodb/trino` | `482` |
+| `80-metabase.yaml` | `metabase` (built locally) | `local` |
 
 The `iceberg-rest` image is built from `docker/iceberg-rest/Dockerfile`, which
 extends `apache/iceberg-rest:1.10.1` and adds the Postgres JDBC driver for
@@ -48,8 +50,8 @@ persistent table metadata via JdbcCatalog. The base image tag tracks the Iceberg
 jar version in the Spark image (both `1.10.1`) so the catalog and Spark agree on
 the table spec.
 
-Init containers use `busybox:1.38` (in `30-iceberg-rest.yaml` and
-`40-spark-iceberg.yaml`).
+Init containers use `busybox:1.38` (in `30-iceberg-rest.yaml`,
+`40-spark-iceberg.yaml`, `70-trino.yaml`, and `80-metabase.yaml`).
 
 > `minio/mc` still uses the floating `latest` tag (it publishes date-stamped
 > `RELEASE.*` tags rather than semver). Pin it to a specific `RELEASE.*` tag for
@@ -113,6 +115,7 @@ and do not reuse the credentials elsewhere.
 | `seaweedfs-data` | 2 Gi | `10-seaweedfs.yaml` |
 | `notebooks` | 1 Gi | `40-spark-iceberg.yaml` |
 | `postgres-data` | 1 Gi | `50-postgres.yaml` |
+| `metabase-data` | 1 Gi | `80-metabase.yaml` |
 
 Both use kind's default `standard` StorageClass (the local-path provisioner).
 SeaweedFS is also capped by `-master.volumeSizeLimitMB=1024`. Bump these if you
@@ -127,6 +130,8 @@ plan to load larger datasets.
 | `spark-iceberg` | 250m | 1Gi | 3Gi |
 | `postgres` | 100m | 256Mi | 1Gi |
 | `loadgen` (Job) | 100m | 128Mi | 512Mi |
+| `trino` (opt-in) | 250m | 2Gi | 3Gi |
+| `metabase` (opt-in) | 100m | 1Gi | 2Gi |
 
 ## Pinning the Kubernetes version
 

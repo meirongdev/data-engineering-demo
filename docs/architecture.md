@@ -49,6 +49,21 @@ that runs on top, see [pipeline.md](pipeline.md).
 - An init container waits for **both** SeaweedFS (8333) and the REST catalog
   (8181) before Spark starts.
 
+### 4. Serving layer (opt-in) — Trino + Metabase
+
+Added by `make serving` on top of the base stack. Full detail in
+[serving.md](serving.md).
+
+**Trino** (`k8s/70-trino.yaml`) — interactive SQL engine. Talks to the same
+Iceberg REST catalog and SeaweedFS data files as Spark. Namespaces appear as
+`iceberg.<namespace>.<table>` (e.g. `iceberg.gold.item_performance`). Uses the
+native S3 filesystem (`fs.s3.enabled=true`) for direct data access.
+
+**Metabase** (`docker/metabase/Dockerfile` + `k8s/80-metabase.yaml`) — BI
+dashboards on the gold-layer tables. Connects to Trino via the Starburst
+community driver (baked into the `metabase:local` image). Embedded H2 metadata
+on a 1 Gi PVC.
+
 ### Bootstrap — bucket-init (`k8s/20-bucket-init.yaml`)
 
 A one-shot `minio/mc` Job that waits for SeaweedFS, then creates the `warehouse`
@@ -116,10 +131,12 @@ with no `kubectl port-forward`.
 | 8333 | 30333 | `seaweedfs` | SeaweedFS S3 API |
 | 9333 | 30933 | `seaweedfs` | SeaweedFS master UI |
 | 5432 | 30432 | `postgres` | Postgres `oneshop` source |
+| 8080 | 30080 | `trino` | Trino SQL engine (opt-in) |
+| 3000 | 30300 | `metabase` | Metabase BI dashboards (opt-in) |
 
 Inside the cluster, workloads reach each other by Service DNS:
-`seaweedfs:8333` (S3), `iceberg-rest:8181` (catalog), and `postgres:5432`
-(source).
+`seaweedfs:8333` (S3), `iceberg-rest:8181` (catalog), `postgres:5432`
+(source), `trino:8080` (Trino), and `metabase:3000` (Metabase).
 
 ## Persistence model
 
@@ -129,6 +146,7 @@ Inside the cluster, workloads reach each other by Service DNS:
 | Your notebooks | `notebooks` PVC (1 Gi) | ✅ | ❌ |
 | Postgres source rows | `postgres-data` PVC (1 Gi) | ✅ | ❌ |
 | Catalog table registry | `iceberg_catalog` database in Postgres | ✅ | ❌ |
+| Metabase metadata | `metabase-data` PVC (1 Gi) | ✅ | ❌ |
 
 `make down` deletes the whole kind cluster, including all PVCs. The catalog
 registry is now backed by Postgres, so restarting the `iceberg-rest` pod no

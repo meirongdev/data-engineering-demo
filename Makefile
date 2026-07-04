@@ -6,7 +6,7 @@ SHELL := /bin/bash
 include scripts/defaults.env
 CONTEXT := kind-$(CLUSTER_NAME)
 
-.PHONY: up down deploy build status smoke pipeline loadgen logs jupyter shell help
+.PHONY: up down deploy build build-serving status serving smoke pipeline loadgen logs jupyter shell help
 
 up: ## Create the kind cluster, build/load the image, and deploy everything
 	./scripts/up.sh
@@ -14,11 +14,18 @@ up: ## Create the kind cluster, build/load the image, and deploy everything
 down: ## Delete the kind cluster (and all data in it)
 	./scripts/down.sh
 
-build: ## Build the Spark/Iceberg image and load it into the cluster
+build: ## Build the base images (Spark, loadgen, iceberg-rest) and load into cluster
 	./scripts/build-image.sh
+
+build-serving: ## Build just the serving-layer images (metabase)
+	docker build -f docker/metabase/Dockerfile -t metabase:local .
+	kind load docker-image metabase:local --name $(CLUSTER_NAME)
 
 deploy: ## (Re)apply the k8s manifests and wait for readiness
 	./scripts/deploy.sh
+
+serving: ## Deploy the serving layer (Trino + Metabase) on top of the base stack
+	./scripts/deploy-serving.sh
 
 status: ## Show pods/services and the host access URLs
 	./scripts/status.sh

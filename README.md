@@ -11,6 +11,8 @@ Compose onto Kubernetes, modernised.
 | Object storage | **SeaweedFS** (S3 API) | Apache 2.0, lightweight, S3-compatible |
 | Table catalog | **Apache Iceberg REST catalog** | the reference `iceberg-rest-fixture` |
 | Compute / notebooks | **Spark 3.5 + Iceberg 1.10 + Jupyter Lab** | write PySpark / SQL against Iceberg tables |
+| Interactive SQL (opt-in) | **Trino** (added by `make serving`) | query the same Iceberg tables without Spark |
+| BI (opt-in) | **Metabase** (added by `make serving`) | dashboards on the gold-layer tables |
 | Platform | **kind** (k8s in Docker) | learn Kubernetes and data infra together |
 
 On top of the storage/catalog/compute stack, a **medallion (bronze → silver →
@@ -35,10 +37,18 @@ validates and enriches it, and builds an item-performance analytics table. See
    │   │  bucket: pageviews    │          │  Spark + Iceberg      │           │
    │   │  bucket: warehouse    │◀─────────│  Jupyter Lab (:8888)  │  S3 write │
    │   │  (Iceberg data files) │  S3 write │  Spark UI (:4040)     │           │
-   │   └──────────────────────┘          └──────────────────────┘           │
+   │   └──────────┬───────────┘          └──────────────────────┘           │
+   │              │                                                          │
+   │              │  same catalog, same data                                 │
+   │              ▼                                                          │
+   │   ┌──────────────────────┐  ┌──────────────────────┐                    │
+   │   │  trino (:8080)        │  │  metabase (:3000)    │  (opt-in —        │
+   │   │  interactive SQL      │──│  BI dashboards       │   make serving)   │
+   │   └──────────────────────┘  └──────────────────────┘                    │
    └────────────────────────────────────────────────────────────────────────┘
         host ports: 8888 (Jupyter) · 4040 (Spark UI) · 8181 (REST)
                      8333 (S3) · 9333 (SeaweedFS UI) · 5432 (Postgres)
+                     8080 (Trino, opt-in) · 3000 (Metabase, opt-in)
 ```
 
 Spark asks the REST catalog for table metadata; the catalog hands back the table
@@ -58,6 +68,7 @@ preflight-checked by `scripts/up.sh`.
 make up        # kind cluster -> build & load images -> deploy everything
 make smoke     # end-to-end test: create an Iceberg table, read it back
 make pipeline  # run the medallion pipeline: loadgen -> bronze -> silver -> gold
+make serving   # (opt-in) deploy Trino + Metabase on top
 make status    # pods/services + the URLs below
 ```
 
@@ -78,6 +89,8 @@ notebooks `01`–`04`. See [docs/pipeline.md](docs/pipeline.md).
 | http://localhost:8333 | SeaweedFS S3 API (`admin` / `password`) |
 | http://localhost:9333 | SeaweedFS master UI |
 | localhost:5432 | Postgres `oneshop` source (`etluser` / `etlpassword`) |
+| http://localhost:8080 | Trino SQL engine (opt-in, after `make serving`) |
+| http://localhost:3000 | Metabase BI dashboards (opt-in, after `make serving`) |
 
 Tear everything down (deletes the cluster and all its data):
 
@@ -102,7 +115,9 @@ k8s/                         manifests, applied in order by deploy.sh
   30-iceberg-rest.yaml       Iceberg REST catalog
   40-spark-iceberg.yaml      Spark + Jupyter (uses the locally built image)
   60-loadgen.yaml            Job: seed Postgres + pageviews (run on demand by make pipeline)
-notebooks/                   seeded into Jupyter on first start (00 intro, 01-04 pipeline)
+  70-trino.yaml              Trino SQL engine (opt-in, deployed by make serving)
+  80-metabase.yaml           Metabase BI dashboards (opt-in, deployed by make serving)
+notebooks/                   seeded into Jupyter on first start (00 intro, 01-04 pipeline, 05 Trino)
 scripts/                     up / down / build-image / deploy / status / smoke-test / pipeline (+ lib.sh)
 Makefile                     thin wrapper over scripts/
 ```
@@ -119,6 +134,7 @@ Detailed docs live under [`docs/`](docs/):
 - [Operations](docs/operations.md) — `make` targets, the scripts behind them, config env vars, and the rebuild/iterate loop.
 - [Configuration](docs/configuration.md) — versions, Spark/PyIceberg settings, credentials, storage sizes, and version pinning.
 - [Troubleshooting](docs/troubleshooting.md) — common failures and how to recover.
+- [Serving layer](docs/serving.md) — interactive SQL (Trino) and BI dashboards (Metabase) on the lakehouse.
 - [From lab to production](docs/production.md) — this is a lab; what you'd swap each component for (orchestration, catalog, ingestion, storage, secrets, …) to run it for real, and why.
 
 ## Security note

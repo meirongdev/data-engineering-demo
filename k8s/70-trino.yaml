@@ -1,0 +1,132 @@
+# Trino — interactive SQL engine for the Iceberg lakehouse.
+#
+# Reads the *same* Iceberg REST catalog and SeaweedFS data files that Spark
+# writes. Namespaces bronze/silver/gold appear automatically under the `iceberg`
+# catalog. This manifest is opt-in (deployed by `make serving`) to keep the base
+# lab lean at ~4 GB.
+#
+# Trino port 8080 mapped to host port 30080.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trino-config
+  namespace: lakehouse
+data:
+  # ── Trino server config ───────────────────────────────────────────────────
+  config.properties: |
+    coordinator=true
+    node-scheduler.include-coordinator=true
+    http-server.http.port=8080
+    discovery.uri=http://localhost:8080
+    query.max-memory=512MB
+    query.max-memory-per-node=512MB
+    memory.heap-headroom-per-node=256MB
+
+  # ── JVM config (keep heap manageable for kind) ────────────────────────────
+  jvm.config: |
+    -server
+    -Xmx1536M
+    -XX:+UseG1GC
+    -XX:G1HeapRegionSize=32M
+    -XX:+ExplicitGCInvokesConcurrent
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:+ExitOnOutOfMemoryError
+    -Djdk.attach.allowAttachSelf=true
+
+  # ── Node identity ─────────────────────────────────────────────────────────
+  node.properties: |
+    node.environment=production
+    node.data-dir=/data/trino
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trino-catalog
+  namespace: lakehouse
+data:
+  # ── Iceberg connector (shared catalog + storage with Spark) ───────────────
+  # Uses the native S3 filesystem (fs.s3.enabled=true) — the old Hadoop-S3
+  # path (fs.native-s3.enabled) was deprecated/renamed in the Trino 4xx line.
+  iceberg.properties: |
+    connector.name=iceberg
+    iceberg.catalog.type=rest
+    iceberg.rest-catalog.uri=http://iceberg-rest:8181
+    iceberg.rest-catalog.warehouse=s3://warehouse/
+    s3.endpoint=http://seaweedfs:8333
+    s3.region=us-east-1
+    s3.aws-access-key=admin
+    s3.aws-secret-key=password
+    s3.path-style-access=true
+    fs.s3.enabled=true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trino
+  namespace: lakehouse
+  labels:
+    app: trino
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: trino
+  template:
+    metadata:
+      labels:
+        app: trino
+    spec:
+      initContainers:
+        - name: wait-for-deps
+          image: busybox:1.38
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z iceberg-rest 8181; do echo waiting for iceberg-rest; sleep 2; done
+              until nc -z seaweedfs 8333; do echo waiting for seaweedfs; sleep 2; done
+      containers:
+        - name: trino
+          image: trinodb/trino:482
+          ports:
+            - { name: http, containerPort: 8080 }
+          readinessProbe:
+            httpGet: { path: /v1/info, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /v1/info, port: 8080 }
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            requests: { cpu: 250m, memory: 2Gi }
+            limits: { memory: 3Gi }
+          volumeMounts:
+            - { name: config, mountPath: /etc/trino }
+            - { name: catalog, mountPath: /etc/trino/catalog }
+      volumes:
+        - name: config
+          configMap:
+            name: trino-config
+        - name: catalog
+          configMap:
+            name: trino-catalog
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trino
+  namespace: lakehouse
+  labels:
+    app: trino
+spec:
+  type: NodePort
+  selector:
+    app: trino
+  ports:
+    - { name: http, port: 8080, targetPort: 8080, nodePort: 30080 }

@@ -14,6 +14,7 @@ logging helpers + the `kc` kubectl wrapper).
 | `make smoke` | End-to-end Iceberg write/read test inside the cluster | `scripts/smoke-test.sh` |
 | `make pipeline` | Run the medallion pipeline: loadgen → bronze → silver → gold | `scripts/pipeline.sh` |
 | `make loadgen` | (Re)run just the loadgen Job (seed Postgres + pageviews) | (kubectl) |
+| `make serving` | (Opt-in) deploy the Trino + Metabase serving layer | `scripts/deploy-serving.sh` |
 | `make status` | Show pods, services, and host URLs | `scripts/status.sh` |
 | `make logs` | Tail the Spark/Jupyter deployment logs | (kubectl) |
 | `make jupyter` | Open Jupyter Lab in your browser | (open) |

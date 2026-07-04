@@ -90,9 +90,16 @@ For a typical cloud team, a sane starting point:
 > **Terraform** (infra + buckets + IAM) → **Argo CD** (GitOps deploy) →
 > **Dagster** *or* **Airflow** (orchestration + scheduling) → **Spark Operator
 > on K8s** *or* managed Spark (compute) → **dbt** (silver/gold SQL + tests) →
-> **Nessie / Polaris** (catalog) → **Debezium + Kafka** (CDC ingestion) →
-> **OpenLineage + Prometheus/Grafana** (lineage + monitoring) → a scheduled
-> **Iceberg maintenance** job.
+> **Lakekeeper / Polaris** (catalog, persisted) → **Trino** (interactive SQL /
+> BI serving) → **Debezium + Kafka** (CDC ingestion) → **OpenLineage +
+> Prometheus/Grafana** (lineage + monitoring) → a scheduled **Iceberg
+> maintenance** job.
+
+**Lakekeeper** is a lightweight, Rust-based Iceberg REST catalog that fits this
+repo's *lightweight, K8s-native* ethos far better than the JVM-heavy Polaris or
+Nessie. Single binary, Postgres-backed, no JVM overhead. See
+[lakekeeper.dev](https://lakekeeper.dev) — it is the natural catalog-upgrade
+path for this lab.
 
 On a managed cloud (EMR / Dataproc / Databricks + Glue/Unity) much of the
 compute and catalog operations are handled for you; self-hosting means wiring
@@ -113,9 +120,13 @@ Nessie + Spark Operator + storage yourself.
 In priority order, the highest-leverage upgrades:
 
 1. **A real orchestrator** (Dagster/Airflow) to replace `scripts/pipeline.sh`.
-2. **A persistent, HA catalog** (Nessie / Polaris / Glue) to replace the
+2. **A persistent, HA catalog** (Lakekeeper / Polaris / Glue) to replace the
    in-memory REST fixture.
 3. **Managed secrets** to replace the hardcoded `admin` / `password`.
+
+The serving layer (Trino + Metabase) is already the right shape for production
+— Trino is the standard interactive/BI engine for Iceberg, and Metabase's
+embedded H2 should be replaced with Postgres for HA. See [serving.md](serving.md).
 
 Everything else can follow incrementally.
 

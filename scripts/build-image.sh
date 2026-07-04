@@ -29,6 +29,10 @@ docker build \
   "${ROOT_DIR}"
 ok "Built ${ICEBERG_REST_IMAGE}"
 
+# NOTE: the serving-layer image (metabase:local) is intentionally NOT built here.
+# It is opt-in and built/loaded by `make serving` (scripts/deploy-serving.sh) to
+# keep the base stack lean.
+
 if ! cluster_exists; then
   warn "Cluster '${CLUSTER_NAME}' not found — skipping load. Create it first (scripts/up.sh)."
   exit 0
