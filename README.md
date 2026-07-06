@@ -13,6 +13,7 @@ Compose onto Kubernetes, modernised.
 | Compute / notebooks | **Spark 3.5 + Iceberg 1.10 + Jupyter Lab** | write PySpark / SQL against Iceberg tables |
 | Interactive SQL (opt-in) | **Trino** (added by `make serving`) | query the same Iceberg tables without Spark |
 | BI (opt-in) | **Metabase** (added by `make serving`) | dashboards on the gold-layer tables |
+| Orchestration (opt-in) | **Airflow** (added by `make airflow`) | run the pipeline as a monitored, retry-able DAG |
 | Platform | **kind** (k8s in Docker) | learn Kubernetes and data infra together |
 
 On top of the storage/catalog/compute stack, a **medallion (bronze → silver →
@@ -49,6 +50,7 @@ validates and enriches it, and builds an item-performance analytics table. See
         host ports: 8888 (Jupyter) · 4040 (Spark UI) · 8181 (REST)
                      8333 (S3) · 9333 (SeaweedFS UI) · 5432 (Postgres)
                      8080 (Trino, opt-in) · 3000 (Metabase, opt-in)
+                     8880 (Airflow, opt-in)
 ```
 
 Spark asks the REST catalog for table metadata; the catalog hands back the table
@@ -69,6 +71,7 @@ make up        # kind cluster -> build & load images -> deploy everything
 make smoke     # end-to-end test: create an Iceberg table, read it back
 make pipeline  # run the medallion pipeline: loadgen -> bronze -> silver -> gold
 make serving   # (opt-in) deploy Trino + Metabase on top
+make airflow   # (opt-in) deploy Airflow — orchestrate the pipeline as a DAG
 make status    # pods/services + the URLs below
 ```
 
@@ -91,6 +94,7 @@ notebooks `01`–`04`. See [docs/pipeline.md](docs/pipeline.md).
 | localhost:5432 | Postgres `oneshop` source (`etluser` / `etlpassword`) |
 | http://localhost:8080 | Trino SQL engine (opt-in, after `make serving`) |
 | http://localhost:3000 | Metabase BI dashboards (opt-in, after `make serving`) |
+| http://localhost:8880 | Airflow web UI `admin`/`admin` (opt-in, after `make airflow`) |
 
 Tear everything down (deletes the cluster and all its data):
 
@@ -117,7 +121,9 @@ k8s/                         manifests, applied in order by deploy.sh
   60-loadgen.yaml            Job: seed Postgres + pageviews (run on demand by make pipeline)
   70-trino.yaml              Trino SQL engine (opt-in, deployed by make serving)
   80-metabase.yaml           Metabase BI dashboards (opt-in, deployed by make serving)
-  90-pipeline-cron.yaml      Daily pipeline refresh CronJob (optional, kubectl apply -f)
+  85-airflow.yaml            Airflow orchestration (opt-in, deployed by make airflow)
+  90-pipeline-cron.yaml      Daily pipeline refresh CronJob — the "before" Airflow supersedes
+docker/airflow/              Airflow image + medallion_pipeline DAG (opt-in)
 notebooks/                   seeded into Jupyter on first start (00 intro, 01-04 pipeline, 05 Trino)
 scripts/                     up / down / build-image / deploy / status / smoke-test / pipeline (+ lib.sh)
 Makefile                     thin wrapper over scripts/
@@ -142,6 +148,7 @@ Detailed docs live under [`docs/`](docs/):
 - [Configuration](docs/configuration.md) — versions, Spark/PyIceberg settings, credentials, storage sizes, and version pinning.
 - [Troubleshooting](docs/troubleshooting.md) — common failures and how to recover.
 - [Serving layer](docs/serving.md) — interactive SQL (Trino) and BI dashboards (Metabase) on the lakehouse.
+- [Airflow orchestration](docs/airflow-design.md) — when you outgrow the CronJob, and how one DAG (parallel ingest, retries, a UI) replaces the serial shell loop.
 - [From lab to production](docs/production.md) — this is a lab; what you'd swap each component for (orchestration, catalog, ingestion, storage, secrets, …) to run it for real, and why.
 
 ## Security note

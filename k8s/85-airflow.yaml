@@ -1,0 +1,218 @@
+# Airflow — workflow orchestration for the medallion pipeline.
+#
+# This is the "after" to the CronJob's "before" (90-pipeline-cron.yaml): the same
+# five spark-submit stages, but as a monitored, retry-able DAG. Airflow only
+# needs the BASE stack (Spark image + iceberg-rest + seaweedfs + postgres); the
+# serving layer (Trino/Metabase) is NOT required.
+#
+# Opt-in — deployed by `make airflow` (scripts/deploy-airflow.sh), so the base
+# lab stays lean. Airflow web UI: http://localhost:8880 (admin / admin).
+#
+# Layout:
+#   - ServiceAccount + Role + RoleBinding  → let KubernetesPodOperator manage pods
+#   - airflow-env ConfigMap                → shared AIRFLOW__* settings
+#   - airflow-postgres                     → Airflow metadata DB (LocalExecutor)
+#   - airflow (1 pod, 2 containers)        → scheduler + webserver
+#   - airflow-webserver Service (NodePort) → UI on :30880 → host :8880
+---
+# RBAC: the scheduler runs each DAG task as an ephemeral pod, so its service
+# account needs to create/watch/delete pods (and read their logs) in this namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: airflow
+  namespace: lakehouse
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: airflow-pod-operator
+  namespace: lakehouse
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "get", "list", "watch", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: airflow-pod-operator
+  namespace: lakehouse
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: airflow-pod-operator
+subjects:
+  - kind: ServiceAccount
+    name: airflow
+    namespace: lakehouse
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-env
+  namespace: lakehouse
+data:
+  # LocalExecutor runs task subprocesses in the scheduler — enough for a single
+  # node, and it gives us real parallelism (SQLite/SequentialExecutor could not
+  # run the two bronze ingests at once).
+  AIRFLOW__CORE__EXECUTOR: "LocalExecutor"
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow"
+  # Demo secret — do NOT reuse outside local development.
+  AIRFLOW__WEBSERVER__SECRET_KEY: "lakehouse-demo-not-a-secret"
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+  # Un-paused on creation so `make airflow` → open UI → hit Trigger just works.
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+---
+# Airflow metadata database (DAG runs, task instances, connections). Separate
+# from the oneshop source Postgres so the orchestration layer is self-contained.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-postgres
+  namespace: lakehouse
+  labels:
+    app: airflow-postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: airflow-postgres
+  template:
+    metadata:
+      labels:
+        app: airflow-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          env:
+            - { name: POSTGRES_USER, value: airflow }
+            - { name: POSTGRES_PASSWORD, value: airflow }
+            - { name: POSTGRES_DB, value: airflow }
+            # Point PGDATA at a subdir so the emptyDir mount root stays clean.
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports:
+            - { name: postgres, containerPort: 5432 }
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "airflow"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+      volumes:
+        # Ephemeral: metadata is disposable in a demo. `make down` clears it.
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-postgres
+  namespace: lakehouse
+  labels:
+    app: airflow-postgres
+spec:
+  selector:
+    app: airflow-postgres
+  ports:
+    - { name: postgres, port: 5432, targetPort: 5432 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow
+  namespace: lakehouse
+  labels:
+    app: airflow
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: airflow
+  template:
+    metadata:
+      labels:
+        app: airflow
+    spec:
+      serviceAccountName: airflow
+      initContainers:
+        # 1. wait for the metadata DB to accept connections.
+        - name: wait-for-db
+          image: busybox:1.38
+          command:
+            - sh
+            - -c
+            - until nc -z airflow-postgres 5432; do echo waiting for airflow-postgres; sleep 2; done
+        # 2. run migrations + create the admin user (both idempotent).
+        - name: airflow-init
+          image: airflow-iceberg:local
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: { name: airflow-env }
+          command:
+            - bash
+            - -c
+            - |
+              airflow db migrate
+              airflow users create \
+                --username admin --password admin \
+                --firstname Admin --lastname User \
+                --role Admin --email admin@example.com || true
+      containers:
+        - name: scheduler
+          image: airflow-iceberg:local
+          imagePullPolicy: IfNotPresent
+          args: ["scheduler"]
+          envFrom:
+            - configMapRef: { name: airflow-env }
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 1Gi }
+        - name: webserver
+          image: airflow-iceberg:local
+          imagePullPolicy: IfNotPresent
+          args: ["webserver"]
+          envFrom:
+            - configMapRef: { name: airflow-env }
+          ports:
+            - { name: web, containerPort: 8080 }
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver
+  namespace: lakehouse
+  labels:
+    app: airflow
+spec:
+  type: NodePort
+  selector:
+    app: airflow
+  ports:
+    - { name: web, port: 8080, targetPort: 8080, nodePort: 30880 }

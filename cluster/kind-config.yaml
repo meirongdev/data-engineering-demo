@@ -12,6 +12,7 @@
 #   localhost:5432  -> Postgres (oneshop)     (NodePort 30432)
 #   localhost:8080  -> Trino                  (NodePort 30080) [opt-in]
 #   localhost:3000  -> Metabase               (NodePort 30300) [opt-in]
+#   localhost:8880  -> Airflow web UI          (NodePort 30880) [opt-in]
 #
 # The k8s version follows whatever node image ships with your kind release.
 # To pin it, add e.g. `image: kindest/node:v1.36.1` under each node.
@@ -45,6 +46,10 @@ nodes:
         protocol: TCP
       - containerPort: 30300
         hostPort: 3000
+        protocol: TCP
+      # Orchestration layer (opt-in, make airflow)
+      - containerPort: 30880
+        hostPort: 8880
         protocol: TCP
   - role: worker
   - role: worker

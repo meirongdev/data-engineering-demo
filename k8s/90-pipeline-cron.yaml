@@ -10,8 +10,10 @@
 # - This still does NOT re-run the loadgen, so no *new* source rows arrive
 #   between CronJob runs. To keep source data fresh you would also schedule
 #   the loadgen Job — out of scope for this lab.
-# - S3/REST creds come from spark-defaults.conf in the image, so no AWS_*
-#   env vars are needed.
+# - S3 keys come from spark-defaults.conf in the image, but Iceberg's S3FileIO
+#   (AWS SDK v2) still needs a region. A pod launched fresh from the image does
+#   not inherit one, so we set AWS_* env here — mirroring 40-spark-iceberg.yaml
+#   (the interactive Deployment) so `make pipeline` and this CronJob behave alike.
 #
 # Deploy: kubectl apply -f k8s/90-pipeline-cron.yaml
 # Inspect: kubectl get cronjobs,pods -n lakehouse -l app=pipeline-refresh
@@ -44,6 +46,12 @@ spec:
             - name: spark-submit
               image: spark-iceberg:local
               imagePullPolicy: IfNotPresent
+              env:
+                # Iceberg S3FileIO (AWS SDK v2) needs a region even against
+                # SeaweedFS; keys mirror 40-spark-iceberg.yaml for parity.
+                - { name: AWS_ACCESS_KEY_ID, value: admin }
+                - { name: AWS_SECRET_ACCESS_KEY, value: password }
+                - { name: AWS_REGION, value: us-east-1 }
               command:
                 - sh
                 - -c

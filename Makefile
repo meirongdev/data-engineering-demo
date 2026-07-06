@@ -6,7 +6,7 @@ SHELL := /bin/bash
 include scripts/defaults.env
 CONTEXT := kind-$(CLUSTER_NAME)
 
-.PHONY: up down deploy build build-serving status serving check hooks smoke pipeline loadgen logs jupyter shell help
+.PHONY: up down deploy build build-serving status serving airflow airflow-ui check hooks smoke pipeline loadgen logs jupyter shell help
 
 up: ## Create the kind cluster, build/load the image, and deploy everything
 	./scripts/up.sh
@@ -26,6 +26,12 @@ deploy: ## (Re)apply the k8s manifests and wait for readiness
 
 serving: ## Deploy the serving layer (Trino + Metabase) on top of the base stack
 	./scripts/deploy-serving.sh
+
+airflow: ## Deploy the orchestration layer (Airflow) on top of the base stack
+	./scripts/deploy-airflow.sh
+
+airflow-ui: ## Open the Airflow web UI in your browser (admin/admin)
+	open http://localhost:8880 || xdg-open http://localhost:8880
 
 check: ## Run static pre-flight checks (shell/notebook/yaml/image-pins) — no cluster needed
 	./scripts/check.sh
