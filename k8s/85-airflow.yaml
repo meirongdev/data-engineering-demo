@@ -67,6 +67,10 @@ data:
   AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
   # Un-paused on creation so `make airflow` → open UI → hit Trigger just works.
   AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+  # Fewer Gunicorn workers → much lower webserver memory. The default (4) each
+  # load the whole app and OOM a 1–2Gi container once you browse the UI; 2 is
+  # plenty for a single-user demo.
+  AIRFLOW__WEBSERVER__WORKERS: "2"
 ---
 # Airflow metadata database (DAG runs, task instances, connections). Separate
 # from the oneshop source Postgres so the orchestration layer is self-contained.
@@ -200,8 +204,10 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 5
           resources:
-            requests: { cpu: 250m, memory: 512Mi }
-            limits: { memory: 1Gi }
+            requests: { cpu: 250m, memory: 768Mi }
+            # Headroom for the webserver under active UI use — it OOMs at 1Gi
+            # once you browse the Grid/Graph views (2 Gunicorn workers, see env).
+            limits: { memory: 2Gi }
 ---
 apiVersion: v1
 kind: Service
